@@ -140,8 +140,39 @@
       return inWords(Math.floor(num)) + ' Rupees Only';
     }
 
+    function setCookie(name, value, days = 365) {
+  const expires = new Date(Date.now() + days*24*60*60*1000).toUTCString();
+  document.cookie = `${name}=${value}; expires=${expires}; path=/`;
+}
+
+function getCookie(name) {
+  const cookieArr = document.cookie.split("; ");
+  for (let cookie of cookieArr) {
+    const [key, val] = cookie.split("=");
+    if (key === name) return val;
+  }
+  return null;
+}
+window.onload = function () {
+  let lastInvoice = getCookie("lastInvoice");
+
+  if (!lastInvoice) {
+    // If no cookie found, start from 2501
+    lastInvoice = 2501;
+    setCookie("lastInvoice", lastInvoice);
+  }
+
+  // Set invoice number input field
+  document.getElementById("invoiceNo").value = lastInvoice;
+};
+     
+
     function generateBill() {
       const invoiceNo = document.getElementById("invoiceNo").value;
+      // Save next invoice number to cookie
+let nextInvoice = parseInt(invoiceNo) + 1;
+setCookie("lastInvoice", nextInvoice);
+
       const useBillTo = document.getElementById("w-checkbox").checked;
       let billToHTML = '';
       let customer;
