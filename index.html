@@ -172,6 +172,8 @@ window.onload = function () {
       // Save next invoice number to cookie
 let nextInvoice = parseInt(invoiceNo) + 1;
 setCookie("lastInvoice", nextInvoice);
+      document.getElementById("invoiceNo").value = nextInvoice;
+
 
       const useBillTo = document.getElementById("w-checkbox").checked;
       let billToHTML = '';
