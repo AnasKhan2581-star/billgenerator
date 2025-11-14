@@ -212,7 +212,7 @@ setCookie("lastInvoice", nextInvoice);
       let formattedDate = invoiceDate;
       if (invoiceDate) {
         const [yyyy, mm, dd] = invoiceDate.split('-');
-        formattedDate = `${dd} ${mm} ${yyyy}`;
+        formattedDate = `${dd}/${mm}/${yyyy}`;
       }
       const useIGST = document.getElementById("igstToggle").checked;
 
