@@ -185,13 +185,6 @@ window.onload = function () {
       setCookie("lastInvoice", nextInvoice);
       document.getElementById("invoiceNo").value = nextInvoice;
 
-      const invoiceDate = document.getElementById("invoiceDate").value;
-
-       if (!invoiceDate) {
-       alert("Please select a date before generating the bill.");
-       return;
-       }
-
 
       const useBillTo = document.getElementById("w-checkbox").checked;
       let billToHTML = '';
