@@ -350,67 +350,100 @@ window.onload = function () {
     }
 
     async function shareBill() {
-      const billDiv = document.getElementById("billOutput");
-      if (!billDiv.innerHTML.trim()) {
-        alert("Please generate the bill first.");
+  const billDiv = document.getElementById("billOutput");
+  if (!billDiv.innerHTML.trim()) {
+    alert("Please generate the bill first.");
+    return;
+  }
+
+  const shareBtn = document.querySelector('button[onclick="shareBill()"]');
+  if (shareBtn) { shareBtn.disabled = true; shareBtn.textContent = "Preparing..."; }
+
+  try {
+    // 1) Increment invoice number IMMEDIATELY (keeps numbering consistent)
+    const current = parseInt(document.getElementById("invoiceNo").value) || 2501;
+    const next = current + 1;
+    setCookie("lastInvoice", next);
+    document.getElementById("invoiceNo").value = next;
+
+    // 2) Generate PDF (async). Keep this inside click flow.
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+
+    // Wait for jsPDF to render HTML to PDF
+    await doc.html(billDiv, {
+      margin: [20, 20, 20, 20],
+      autoPaging: true,
+      x: 0,
+      y: 0,
+      width: 550,
+      windowWidth: 800
+    });
+
+    // 3) Get PDF blob
+    const pdfBlob = doc.output('blob');
+
+    // 4) Try Web Share API with files (best on Android)
+    const fileName = `Invoice_${document.getElementById("invoiceNo").value}.pdf`;
+    const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+    // If browser supports sharing files
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: 'Bill',
+          text: 'Here is your generated bill.',
+          files: [file]
+        });
+        // Shared successfully
         return;
+      } catch (err) {
+        // User canceled or share failed — fall through to fallback
+        console.warn('navigator.share failed or cancelled:', err);
       }
-
-      
-      // Increase invoice number before sharing
-      const current = parseInt(document.getElementById("invoiceNo").value);
-      const next = current + 1;
-
-      setCookie("lastInvoice", next);
-      document.getElementById("invoiceNo").value = next;
-      
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('p', 'pt', 'a4');
-
-      await doc.html(billDiv, {
-        callback: async function (doc) {
-          const pdfBlob = doc.output('blob');
-          const file = new File([pdfBlob], 'Bill.pdf', { type: 'application/pdf' });
-
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-              await navigator.share({
-                title: 'Bill',
-                text: 'Here is your generated bill.',
-                files: [file]
-              });
-            } catch (err) {
-              // User cancelled or sharing failed
-            }
-          } else {
-            // Fallback: Download AND prompt open
-            const url = URL.createObjectURL(pdfBlob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "Bill.pdf";
-            a.style.display = "none";
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-              document.body.removeChild(a);
-              // For Android, prompt user to open with another app (like Noko Print)
-              if (window.AndroidOpenFile) {
-                window.AndroidOpenFile.open('Bill.pdf');
-              }
-            }, 500);
-            alert('Sharing is not supported on this device. The bill PDF has been downloaded. Open it with Noko Print or any print app.');
-          }
-        },
-        margin: [20, 20, 20, 20],
-        autoPaging: true,
-        x: 0,
-        y: 0,
-        width: 550,
-        windowWidth: 800
-      });
-
     }
+
+    // 5) Fallbacks for desktop / unsupported
+    // Try opening in new tab (some browsers allow blob URLs in new tab)
+    try {
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      // open in new tab
+      window.open(blobUrl, '_blank');
+      // Also create an automatic download link for convenience
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 1000);
+      return;
+    } catch (err) {
+      console.error('Fallback open/download failed:', err);
+    }
+
+    // Final fallback: trigger download via data URL
+    const fallbackUrl = URL.createObjectURL(pdfBlob);
+    const a2 = document.createElement('a');
+    a2.href = fallbackUrl;
+    a2.download = fileName;
+    document.body.appendChild(a2);
+    a2.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(fallbackUrl);
+      if (a2.parentNode) a2.parentNode.removeChild(a2);
+    }, 1000);
+
+  } catch (err) {
+    console.error('shareBill error:', err);
+    alert('Could not share the bill. The PDF has been downloaded instead.');
+  } finally {
+    if (shareBtn) { shareBtn.disabled = false; shareBtn.textContent = "Share Bill"; }
+  }
+}
+
   </script>
 </body>
 </html>
