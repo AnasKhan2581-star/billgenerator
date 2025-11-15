@@ -356,6 +356,14 @@ window.onload = function () {
         return;
       }
 
+      
+      // Increase invoice number before sharing
+      const current = parseInt(document.getElementById("invoiceNo").value);
+      const next = current + 1;
+
+      setCookie("lastInvoice", next);
+      document.getElementById("invoiceNo").value = next;
+      
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF('p', 'pt', 'a4');
 
@@ -401,12 +409,6 @@ window.onload = function () {
         width: 550,
         windowWidth: 800
       });
-      // Increase invoice number before sharing
-      const current = parseInt(document.getElementById("invoiceNo").value);
-      const next = current + 1;
-
-      setCookie("lastInvoice", next);
-      document.getElementById("invoiceNo").value = next;
 
     }
   </script>
