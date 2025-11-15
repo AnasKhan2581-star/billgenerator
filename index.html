@@ -12,6 +12,7 @@
         border: 1px solid #ccc !important;
         padding: 10px !important;
         border-radius: 6px !important;
+        margin-top: 12px !important;
         margin-bottom: 12px !important;
       }
       .print-container {
@@ -56,10 +57,9 @@
         4760/2, Ground Floor, Jaipuriya building,<br>
         Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
         GSTIN/UIN: 07AGGPK5556M1ZX<br>
-        01145604564, 9899558755
-      </p>
-      
+        01145604564, 9899558755<br>
         <strong> Tax Invoice</strong>
+      </p>
     </div>
 
     <div style="margin-top: 16px; display: flex; justify-content: space-between;">
@@ -219,7 +219,7 @@ window.onload = function () {
         const gstin = document.getElementById("billto-gstin").value;
         billToHTML = `
         <div class="billto-print-box">
-          <div style="margin-bottom: 12px; margin-top: 10px; font-size: 16px; line-height: 1.5;">
+          <div style="font-size: 16px; line-height: 1.5;">
             <strong style="margin-left: 8px;">Bill To:-</strong><br>
             <span style="margin-left: 8px;"><strong>Name:</strong> ${name || ' '}</span><br>
             <span style="margin-left: 8px;"><strong>Address:</strong> ${address || ' '}</span><br>
