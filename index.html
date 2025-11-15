@@ -273,14 +273,14 @@ window.onload = function () {
       for (let key in groups) {
         const { product, hsn, unit, qty, rateIncl } = groups[key];
         const rateExcl = +(rateIncl / 1.05).toFixed(2);
-        const totalIncl = +(qty * rateIncl).toFixed(2);
+        const totalIncl = +(qty * rateIncl).toFixed(2); 
         const totalExcl = +(qty * rateExcl).toFixed(2);
 
         rows += `
           <tr>
             <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${srNo++}</td>
             <td style="border: 1px solid #ccc; padding: 8px;">${product}</td>
-            <td style="border: 1px solid #ccc; padding: 8px;">${hsn}</td>
+            <td contenteditable="true" style="border: 1px solid #ccc; padding: 8px; background:#fff;">${hsn}</td>
             <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${qty}</td>
             <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${unit}</td>
             <td style="border: 1px solid #ccc; padding: 8px; text-align: right;">₹${rateExcl.toFixed(2)}</td>
