@@ -8,6 +8,12 @@
       body {
         padding: 0 !important;
       } 
+      .billto-print-box {
+        border: 1px solid #ccc !important;
+        padding: 10px !important;
+        border-radius: 6px !important;
+        margin-bottom: 12px !important;
+      }
       .print-container {
         margin: 18px 30px !important;
         padding: 8px !important;
@@ -212,14 +218,16 @@ window.onload = function () {
         const stateCode = document.getElementById("billto-statecode").value;
         const gstin = document.getElementById("billto-gstin").value;
         billToHTML = `
+        <div class="billto-print-box">
           <div style="margin-bottom: 12px; margin-top: 10px; font-size: 16px; line-height: 1.5;">
-            <strong>Bill To:</strong><br>
-            <span style="margin-left: 8px;"><strong>Name:</strong> ${name || '-'}</span><br>
-            <span style="margin-left: 8px;"><strong>Address:</strong> ${address || '-'}</span><br>
-            <span style="margin-left: 8px;"><strong>State:</strong> ${state || '-'}</span><br>
-            <span style="margin-left: 8px;"><strong>State Code:</strong> ${stateCode || '-'}</span><br>
-            <span style="margin-left: 8px;"><strong>GSTIN/UDIN:</strong> ${gstin || '-'}</span>
+            <strong style="margin-left: 8px;" font-size: 18px>Bill To:</strong><br>
+            <span style="margin-left: 8px;"><strong>Name:</strong> ${name || '---'}</span><br>
+            <span style="margin-left: 8px;"><strong>Address:</strong> ${address || '---'}</span><br>
+            <span style="margin-left: 8px;"><strong>State:</strong> ${state || '---'}</span><br>
+            <span style="margin-left: 8px;"><strong>State Code:</strong> ${stateCode || '---'}</span><br>
+            <span style="margin-left: 8px;"><strong>GSTIN/UDIN:</strong> ${gstin || '---'}</span>
           </div>
+        </div>
         `;
       } else {
         customer = document.getElementById("customer").value;
