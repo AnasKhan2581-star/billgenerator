@@ -73,8 +73,9 @@
     }
     #batchCloseBtn:hover { background: #333; }
     #_batchTempRender {
-      position: fixed; left: -9999px; top: 0;
-      width: 800px; font-family: Arial; background: white; padding: 32px;
+      position: fixed; left: 0; top: 0;
+      width: 794px; font-family: Arial; background: white; padding: 32px;
+      z-index: 99998; opacity: 0; pointer-events: none;
     }
   </style>
 </head>
@@ -444,13 +445,54 @@
   }
 
   async function renderToPDF(domNode) {
-    const {jsPDF} = window.jspdf;
-    const doc = new jsPDF('p','pt','a4');
-    await doc.html(domNode, {
-      margin:[20,20,20,20], autoPaging:true,
-      x:0, y:0, width:550, windowWidth:800
+    const canvas = await html2canvas(domNode, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
     });
-    return doc.output('blob');
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const {jsPDF} = window.jspdf;
+    // A4 dimensions in mm: 210 x 297
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 10;
+    const usableW = pageW - margin * 2;
+    const imgW = canvas.width;
+    const imgH = canvas.height;
+    const ratio = usableW / (imgW / (canvas.width / usableW));
+    // scale image width to usable page width
+    const pdfImgW = usableW;
+    const pdfImgH = (imgH / imgW) * pdfImgW;
+    const usableH = pageH - margin * 2;
+    let yPos = 0;
+    let pageYOffset = margin;
+    let firstPage = true;
+    while (yPos < pdfImgH) {
+      if (!firstPage) { pdf.addPage(); pageYOffset = margin; }
+      const sliceH = Math.min(usableH, pdfImgH - yPos);
+      // crop the canvas slice
+      const sliceCanvas = document.createElement('canvas');
+      const scaleF = canvas.width / pdfImgW;
+      sliceCanvas.width  = canvas.width;
+      sliceCanvas.height = sliceH * scaleF;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, yPos * scaleF, canvas.width, sliceH * scaleF, 0, 0, canvas.width, sliceH * scaleF);
+      const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.95);
+      pdf.addImage(sliceData, 'JPEG', margin, pageYOffset, pdfImgW, sliceH);
+      yPos += sliceH;
+      firstPage = false;
+    }
+    return pdf.output('blob');
+  }
+
+  function directDownload(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
   }
 
   async function shareOrDownload(blob, fileName) {
@@ -459,11 +501,7 @@
       try { await navigator.share({title:'Bill', text:'Your bill.', files:[file]}); return; }
       catch(e) { console.warn(e); }
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href=url; a.download=fileName;
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+    directDownload(blob, fileName);
   }
 
   /* ═══════════════════════════════════════
@@ -643,7 +681,7 @@
         <hr style="margin:6px 0;">
         ${res.billBodyHTML}`;
       const blob = await renderToPDF(tempDiv);
-      await shareOrDownload(blob, `Invoice_${res.billNo||idx+1}.pdf`);
+      directDownload(blob, `Invoice_${res.billNo||idx+1}.pdf`);
     } catch(err) {
       console.error(err);
       alert('PDF generation failed: ' + err.message);
