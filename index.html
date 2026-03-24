@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bill Generator</title>
+  <link href="https://fonts.cdnfonts.com/css/royal-crescent" rel="stylesheet">
+  <style>
+    @media print {
+      body { padding: 0 !important; }
+      .billto-print-box {
+        border: 1px solid #ccc !important;
+        padding: 10px !important;
+        border-radius: 6px !important;
+        margin-top: 12px !important;
+        margin-bottom: 12px !important;
+      }
+      .print-container {
+        margin: 14px 30px !important;
+        padding: 8px !important;
+        box-shadow: none !important;
+      }
+      button, input, select, label.igst-toggle { display: none !important; }
+      .print-text { display: inline; }
+      .screen-only { display: none; }
+      #itemContainer { display: none !important; }
+    }
+    .print-text { display: none; }
+    #printSaveBtns { display: block !important; }
+
+    /* ── Batch Modal ── */
+    #batchModal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 9999;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 40px;
+      overflow-y: auto;
+    }
+    #batchModal.open { display: flex; }
+    #batchModalBox {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 32px 32px;
+      width: 95%;
+      max-width: 960px;
+      margin-bottom: 40px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+      font-family: Arial, sans-serif;
+    }
+    #batchModalBox h3 { margin: 0 0 4px; font-size: 20px; }
+    #batchSubtitle { font-size: 12px; color: #888; margin-bottom: 14px; }
+    #batchProgress { font-size: 13px; color: #444; margin-bottom: 12px; font-weight: bold; }
+    #batchTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #batchTable th {
+      background: #f0f0f0; border: 1px solid #ccc;
+      padding: 8px 10px; text-align: left; white-space: nowrap;
+    }
+    #batchTable td { border: 1px solid #ccc; padding: 7px 10px; vertical-align: middle; }
+    #batchTable tr:nth-child(even) td { background: #fafafa; }
+    .batch-dl-btn {
+      padding: 5px 13px; background: #1a73e8; color: #fff;
+      border: none; border-radius: 4px; cursor: pointer; font-size: 12px;
+    }
+    .batch-dl-btn:hover { background: #1558b0; }
+    .batch-dl-btn:disabled { background: #aaa; cursor: default; }
+    .status-ok  { color: #2a7a2a; font-weight: bold; font-size: 12px; }
+    .status-err { color: #c0392b; font-weight: bold; font-size: 12px; }
+    #batchCloseBtn {
+      margin-top: 20px; padding: 9px 24px;
+      background: #555; color: #fff;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
+    }
+    #batchCloseBtn:hover { background: #333; }
+    #_batchTempRender {
+      position: fixed; left: -9999px; top: 0;
+      width: 800px; font-family: Arial; background: white; padding: 32px;
+    }
+  </style>
+</head>
+<body style="font-family: Arial; padding: 32px; background: #f5f5f5;">
+
+  <!-- Hidden batch file input -->
+  <input type="file" id="batchFileInput" accept=".xlsx,.xls,.csv"
+         style="display:none;" onchange="handleBatchFile(this)">
+
+  <!-- Off-screen render area for PDF generation -->
+  <div id="_batchTempRender"></div>
+
+  <!-- Batch Results Modal -->
+  <div id="batchModal">
+    <div id="batchModalBox">
+      <h3>📋 Batch Bills</h3>
+      <div id="batchSubtitle"></div>
+      <div id="batchProgress"></div>
+      <div style="overflow-x:auto;">
+        <table id="batchTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Bill No</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Items</th>
+              <th>Grand Total</th>
+              <th>Tax Type</th>
+              <th>Status</th>
+              <th>Download</th>
+            </tr>
+          </thead>
+          <tbody id="batchTableBody"></tbody>
+        </table>
+      </div>
+      <button id="batchCloseBtn" onclick="closeBatchModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       ORIGINAL APP — COMPLETELY UNCHANGED
+  ══════════════════════════════════════════ -->
+  <div class="print-container" style="max-width:980px;margin:40px auto;background:white;padding:32px;border-radius:14px;">
+    <div style="text-align:center;position:relative;">
+      <span style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;">Duplicate</span>
+      <h2 style="font-family:'Helvetica',font-weight:bold,cursive;font-size:38px;margin:0;">Anas Traders</h2>
+      <p style="margin:5px 0;font-size:16px;">
+        4760/2, Ground Floor, Jaipuriya building,<br>
+        Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
+        GSTIN/UIN: 07AGGPK5556M1ZX<br>
+        01145604564, 9899558755<br>
+        <!-- Triple-click "Tax Invoice" to open hidden batch uploader -->
+        <strong id="taxInvoiceLabel" style="margin-top:3px;cursor:default;user-select:none;"> Tax Invoice</strong>
+      </p>
+    </div>
+
+    <div style="margin-top:6px;display:flex;justify-content:space-between;">
+      <label class="screen-only">Invoice No:
+        <input type="text" id="invoiceNo" style="padding:5px;">
+      </label>
+      <span id="customer-billto-wrapper" style="display:flex;align-items:center;">
+        <label class="screen-only" id="customer-label" style="margin-right:8px;">Customer:
+          <input type="text" id="customer" value="Cash" style="padding:5px;">
+        </label>
+        <label class="screen-only" for="w-checkbox" style="margin:0 6px 0 0;font-weight:bold;">W</label>
+        <input type="checkbox" id="w-checkbox" onclick="toggleBillTo()" style="margin-right:8px;">
+      </span>
+
+      <div id="billto-section" class="screen-only" style="display:none;margin-right:8px;">
+        <div style="background:#f8f9fa;border:1px solid #ddd;border-radius:8px;padding:15px;margin-top:10px;min-width:320px;">
+          <div style="display:flex;flex-wrap:wrap;gap:12px;">
+            <div style="flex:1 1 45%;">
+              <label style="font-weight:bold;">Name</label>
+              <input type="text" value="Cash" id="billto-name" style="padding:8px;width:100%;border-radius:4px;border:1px solid #bbb;">
+            </div>
+            <div style="flex:1 1 100%;">
+              <label style="font-weight:bold;">Address</label>
+              <input type="text" id="billto-address" style="padding:8px;width:100%;border-radius:4px;border:1px solid #bbb;">
+            </div>
+            <div style="flex:1 1 45%;">
+              <label style="font-weight:bold;">State</label>
+              <input type="text" id="billto-state" style="padding:8px;width:100%;border-radius:4px;border:1px solid #bbb;">
+            </div>
+            <div style="flex:1 1 45%;">
+              <label style="font-weight:bold;">State Code</label>
+              <input type="text" id="billto-statecode" style="padding:8px;width:100%;border-radius:4px;border:1px solid #bbb;">
+            </div>
+            <div style="flex:1 1 100%;">
+              <label style="font-weight:bold;">GSTIN/UDIN</label>
+              <input type="text" id="billto-gstin" style="padding:8px;width:100%;border-radius:4px;border:1px solid #bbb;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <label class="screen-only">Date:
+        <input type="date" id="invoiceDate" style="padding:5px;">
+      </label>
+    </div>
+
+    <button onclick="addItem()" style="margin-top:18px;padding:10px 15px;background:green;color:white;border:none;border-radius:5px;">+ Add Item</button>
+    <button onclick="generateBill()" style="margin-top:18px;padding:10px 15px;background:blue;color:white;border:none;border-radius:5px;margin-left:10px;">Generate Bill</button>
+    <label class="screen-only igst-toggle"
+           style="margin-top:18px;display:flex;justify-content:flex-end;align-items:center;gap:6px;">
+      <input type="checkbox" id="igstToggle" onclick="confirmIGST(this)" style="margin-right:5px;"> Apply IGST instead of CGST + SGST
+    </label>
+
+    <div id="itemContainer" style="margin-top:28px;"></div>
+    <div id="billOutput" style="margin-top:40px;"></div>
+    <div id="printSaveBtns" style="display:none;margin-top:30px;text-align:center;">
+      <button onclick="printBill()" style="padding:10px 20px;background:#555;color:white;border:none;border-radius:5px;">Print / Save as PDF</button>
+      <button onclick="shareBill()" style="padding:10px 20px;background:#f57c00;color:white;border:none;border-radius:5px;margin-left:12px;">Share Bill</button>
+    </div>
+  </div>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script>
+  /* ═══════════════════════════════════════
+     ORIGINAL APP — UNTOUCHED
+  ═══════════════════════════════════════ */
+
+  function addItem() {
+    const div = document.createElement("div");
+    div.style = "margin-bottom:10px;display:flex;gap:10px;align-items:center;";
+    div.innerHTML = `
+      <select class="product" style="padding:5px;">
+        <option value="Unstitched Suit" data-hsn="5810" data-unit="pc">Suit</option>
+        <option value="Saree" data-hsn="5407" data-unit="pc">Saree</option>
+        <option value="Fabric" data-hsn="5408" data-unit="mtr">Fabric</option>
+      </select>
+      <input type="number" placeholder="Qty" class="qty" style="width:60px;" min="1">
+      <input type="number" placeholder="Rate (incl. GST)" class="rate" style="width:120px;" step="0.01" min="0">
+      <button onclick="this.parentElement.remove()" style="padding:5px 10px;background:red;color:white;">Remove</button>
+    `;
+    document.getElementById("itemContainer").appendChild(div);
+  }
+
+  function printBill() {
+    const current = parseInt(document.getElementById("invoiceNo").value);
+    const next = current + 1;
+    setCookie("lastInvoice", next);
+    document.getElementById("invoiceNo").value = next;
+    window.print();
+  }
+
+  function numberToWords(num) {
+    const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten',
+      'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    function inWords(n) {
+      if (n < 20) return a[n];
+      if (n < 100) return b[Math.floor(n/10)] + (n%10 ? ' '+a[n%10] : '');
+      if (n < 1000) return a[Math.floor(n/100)] + ' Hundred' + (n%100 ? ' and '+inWords(n%100) : '');
+      if (n < 100000) return inWords(Math.floor(n/1000)) + ' Thousand' + (n%1000 ? ' '+inWords(n%1000) : '');
+      return inWords(Math.floor(n/100000)) + ' Lakh' + (n%100000 ? ' '+inWords(n%100000) : '');
+    }
+    return inWords(Math.floor(num)) + ' Rupees Only';
+  }
+
+  function setCookie(name, value, days=365) {
+    const expires = new Date(Date.now()+days*24*60*60*1000).toUTCString();
+    document.cookie = `${name}=${value}; expires=${expires}; path=/`;
+  }
+
+  function getCookie(name) {
+    for (let c of document.cookie.split("; ")) {
+      const [k,v] = c.split("=");
+      if (k===name) return v;
+    }
+    return null;
+  }
+
+  window.onload = function() {
+    let last = getCookie("lastInvoice");
+    if (!last) { last = 2500; setCookie("lastInvoice", last); }
+    document.getElementById("invoiceNo").value = last;
+    document.getElementById("w-checkbox").checked = true;
+    toggleBillTo();
+    setupBatchTrigger();
+  };
+
+  function confirmIGST(checkbox) {
+    if (checkbox.checked) {
+      const ok = confirm("Are you sure you want to apply IGST (5%) instead of CGST + SGST?");
+      if (!ok) checkbox.checked = false;
+    }
+  }
+
+  function generateBill() {
+    const invoiceNo = document.getElementById("invoiceNo").value;
+    const useBillTo = document.getElementById("w-checkbox").checked;
+    let billToHTML = '', customer;
+
+    if (useBillTo) {
+      billToHTML = makeBillToHTML(
+        document.getElementById("billto-name").value,
+        document.getElementById("billto-address").value,
+        document.getElementById("billto-state").value,
+        document.getElementById("billto-statecode").value,
+        document.getElementById("billto-gstin").value
+      );
+    } else {
+      customer = document.getElementById("customer").value;
+    }
+
+    const invoiceDate = document.getElementById("invoiceDate").value;
+    let formattedDate = invoiceDate;
+    if (invoiceDate) {
+      const [yyyy,mm,dd] = invoiceDate.split('-');
+      formattedDate = `${dd}/${mm}/${yyyy}`;
+    }
+
+    const useIGST = document.getElementById("igstToggle").checked;
+    const items = document.querySelectorAll("#itemContainer > div");
+    const groups = {};
+
+    for (let item of items) {
+      const product  = item.querySelector(".product").value;
+      const hsn      = item.querySelector(".product").selectedOptions[0].dataset.hsn;
+      const unit     = item.querySelector(".product").selectedOptions[0].dataset.unit;
+      const qty      = parseInt(item.querySelector(".qty").value);
+      const rateIncl = parseFloat(item.querySelector(".rate").value);
+      if (!qty || !rateIncl || qty<=0 || rateIncl<=0) {
+        alert("Please enter valid quantity and rate for all items."); return;
+      }
+      const key = `${product}_${rateIncl}`;
+      if (!groups[key]) groups[key] = {product,hsn,unit,qty:0,rateIncl};
+      groups[key].qty += qty;
+    }
+
+    const calc = calcTotals(groups, useIGST);
+    const totalInWords = numberToWords(calc.grandTotal);
+    const customerBlock = billToHTML || `<strong>Customer: ${customer}</strong>`;
+    document.getElementById("billOutput").innerHTML =
+      assembleBillHTML(invoiceNo, formattedDate, customerBlock, calc, totalInWords, useIGST);
+    document.getElementById("printSaveBtns").style.display = "block";
+  }
+
+  function toggleBillTo() {
+    const isChecked = document.getElementById("w-checkbox").checked;
+    document.getElementById("customer-label").style.display = isChecked ? "none" : "";
+    document.getElementById("billto-section").style.display = isChecked ? "" : "none";
+  }
+
+  async function shareBill() {
+    const billDiv = document.getElementById("billOutput");
+    if (!billDiv.innerHTML.trim()) { alert("Please generate the bill first."); return; }
+    const shareBtn = document.querySelector('button[onclick="shareBill()"]');
+    if (shareBtn) { shareBtn.disabled=true; shareBtn.textContent="Preparing..."; }
+    try {
+      const current = parseInt(document.getElementById("invoiceNo").value)||2501;
+      setCookie("lastInvoice", current+1);
+      document.getElementById("invoiceNo").value = current+1;
+      const blob = await renderToPDF(billDiv);
+      await shareOrDownload(blob, `Invoice_${current+1}.pdf`);
+    } catch(err) {
+      console.error(err);
+      alert('Could not share. PDF downloaded instead.');
+    } finally {
+      if (shareBtn) { shareBtn.disabled=false; shareBtn.textContent="Share Bill"; }
+    }
+  }
+
+  /* ═══════════════════════════════════════
+     SHARED HELPERS
+  ═══════════════════════════════════════ */
+
+  const PRODUCT_META = {
+    'unstitched suit': {value:'Unstitched Suit', hsn:'5810', unit:'pc'},
+    'suit':            {value:'Unstitched Suit', hsn:'5810', unit:'pc'},
+    'saree':           {value:'Saree',           hsn:'5407', unit:'pc'},
+    'fabric':          {value:'Fabric',          hsn:'5408', unit:'mtr'},
+  };
+
+  function getProductMeta(str) {
+    return PRODUCT_META[(str||'').toLowerCase().trim()] || PRODUCT_META['suit'];
+  }
+
+  function makeBillToHTML(name, address, state, stateCode, gstin) {
+    return `
+    <div class="billto-print-box">
+      <div style="font-size:16px;line-height:1.5;">
+        <strong style="margin-left:8px;">Bill To:-</strong><br>
+        <span style="margin-left:8px;"><strong>Name:</strong> ${name||' '}</span><br>
+        <span style="margin-left:8px;"><strong>Address:</strong> ${address||' '}</span><br>
+        <span style="margin-left:8px;"><strong>State:</strong> ${state||' '}</span><br>
+        <span style="margin-left:8px;"><strong>State Code:</strong> ${stateCode||' '}</span><br>
+        <span style="margin-left:8px;"><strong>GSTIN/UDIN:</strong> ${gstin||' '}</span>
+      </div>
+    </div>`;
+  }
+
+  function calcTotals(groups, useIGST) {
+    let rows='', totalTaxable=0, totalCGST=0, totalSGST=0, totalIGST=0, grandTotal=0, srNo=1;
+    for (let key in groups) {
+      const {product,hsn,unit,qty,rateIncl} = groups[key];
+      const rateExcl  = +(rateIncl/1.05).toFixed(2);
+      const totalIncl = +(qty*rateIncl).toFixed(2);
+      const totalExcl = +(qty*rateExcl).toFixed(2);
+      rows += `<tr>
+        <td style="border:1px solid #ccc;padding:8px;text-align:center;">${srNo++}</td>
+        <td style="border:1px solid #ccc;padding:8px;">${product}</td>
+        <td contenteditable="true" style="border:1px solid #ccc;padding:8px;background:#fff;">${hsn}</td>
+        <td style="border:1px solid #ccc;padding:8px;text-align:center;">${qty}</td>
+        <td style="border:1px solid #ccc;padding:8px;text-align:center;">${unit}</td>
+        <td style="border:1px solid #ccc;padding:8px;text-align:right;">₹${rateExcl.toFixed(2)}</td>
+        <td style="border:1px solid #ccc;padding:8px;text-align:right;">₹${totalExcl.toFixed(2)}</td>
+      </tr>`;
+      totalTaxable += totalExcl;
+      if (useIGST) totalIGST += totalExcl*0.05;
+      else { totalCGST += totalExcl*0.025; totalSGST += totalExcl*0.025; }
+      grandTotal += totalIncl;
+    }
+    return {rows, totalTaxable, totalCGST, totalSGST, totalIGST, grandTotal};
+  }
+
+  function assembleBillHTML(invoiceNo, formattedDate, customerBlock, calc, totalInWords, useIGST) {
+    const {rows, totalTaxable, totalCGST, totalSGST, totalIGST, grandTotal} = calc;
+    return `
+      <div style="margin-top:2px;display:flex;justify-content:space-between;font-size:16px;">
+        <strong>Invoice No: ${invoiceNo}</strong>
+        <strong>Date: ${formattedDate}</strong>
+      </div>
+      ${customerBlock}
+      <table style="width:100%;border-collapse:collapse;margin-top:20px;">
+        <thead>
+          <tr style="background:#f0f0f0;">
+            <th style="border:1px solid #ccc;padding:8px;">Sr. No.</th>
+            <th style="border:1px solid #ccc;padding:8px;">Description</th>
+            <th style="border:1px solid #ccc;padding:8px;">HSN Code</th>
+            <th style="border:1px solid #ccc;padding:8px;">Qty</th>
+            <th style="border:1px solid #ccc;padding:8px;">Unit</th>
+            <th style="border:1px solid #ccc;padding:8px;">Rate</th>
+            <th style="border:1px solid #ccc;padding:8px;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table style="width:100%;margin-top:20px;font-size:16px;">
+        <tr><td><strong>Taxable Amount</strong></td><td style="text-align:right;">₹${totalTaxable.toFixed(2)}</td></tr>
+        <tr><td>CGST 2.5%</td><td style="text-align:right;">₹${useIGST?'0.00':totalCGST.toFixed(2)}</td></tr>
+        <tr><td>SGST 2.5%</td><td style="text-align:right;">₹${useIGST?'0.00':totalSGST.toFixed(2)}</td></tr>
+        <tr><td>IGST 5%</td><td style="text-align:right;">₹${useIGST?totalIGST.toFixed(2):'0.00'}</td></tr>
+        <tr><td><strong>Grand Total</strong></td><td style="text-align:right;"><strong>₹${grandTotal.toFixed(2)}</strong></td></tr>
+      </table>
+      <p style="margin-top:30px;font-size:14px;">
+        <strong>Terms &amp; Conditions:</strong><br>
+        1. No return.<br>
+        2. Exchange within 3 days.<br>
+        3. No guarantee of fabric, color, cutdana etc work in era of fashion.
+      </p>
+      <p style="margin-top:10px;font-size:14px;">
+        <strong>Amount in words:</strong> <span style="text-decoration:underline;">${totalInWords}</span>
+      </p>
+      <div style="margin-top:60px;text-align:right;">
+        <p><strong>For Anas Traders</strong></p>
+        <div style="height:50px;"></div>
+        <p><strong>Proprietor</strong></p>
+      </div>`;
+  }
+
+  async function renderToPDF(domNode) {
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF('p','pt','a4');
+    await doc.html(domNode, {
+      margin:[20,20,20,20], autoPaging:true,
+      x:0, y:0, width:550, windowWidth:800
+    });
+    return doc.output('blob');
+  }
+
+  async function shareOrDownload(blob, fileName) {
+    const file = new File([blob], fileName, {type:'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files:[file]})) {
+      try { await navigator.share({title:'Bill', text:'Your bill.', files:[file]}); return; }
+      catch(e) { console.warn(e); }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=fileName;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+
+  /* ═══════════════════════════════════════
+     BATCH / EXCEL FEATURE (hidden)
+     Activate: triple-click "Tax Invoice"
+  ═══════════════════════════════════════ */
+
+  function setupBatchTrigger() {
+    let clicks=0, timer=null;
+    document.getElementById("taxInvoiceLabel").addEventListener("click", ()=>{
+      clicks++;
+      if (clicks===1) timer = setTimeout(()=>{ clicks=0; }, 600);
+      if (clicks>=3) { clearTimeout(timer); clicks=0; document.getElementById("batchFileInput").click(); }
+    });
+  }
+
+  function handleBatchFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows  = XLSX.utils.sheet_to_json(sheet, {defval:''});
+        processBatch(rows);
+      } catch(err) { alert("Error reading file: " + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+    input.value = '';
+  }
+
+  /*
+    Expected Excel columns:
+    BillNo | Date | CustomerName | Address | State | StateCode | GSTIN | UseIGST
+    Item1Type | Item1Qty | Item1RateInclGST
+    Item2Type | Item2Qty | Item2RateInclGST
+    Item3Type | Item3Qty | Item3RateInclGST
+    ... up to Item10
+
+    Date formats accepted: DD/MM/YYYY  or  YYYY-MM-DD  or Excel date serial
+    UseIGST: write  yes  for IGST, leave blank or write no for CGST+SGST
+    Item types: Suit  /  Saree  /  Fabric  (case insensitive)
+  */
+  function processBatch(excelRows) {
+    openBatchModal();
+    document.getElementById("batchTableBody").innerHTML = '';
+    document.getElementById("batchProgress").textContent = `Processing ${excelRows.length} bill(s)…`;
+    document.getElementById("batchSubtitle").textContent =
+      'Triple-click "Tax Invoice" to load another file.';
+
+    window._batchResults = [];
+
+    for (let i=0; i<excelRows.length; i++) {
+      const r = excelRows[i];
+
+      // Basic fields
+      const billNo    = String(r['BillNo']||r['Bill No']||r['billno']||'').trim();
+      const dateRaw   = r['Date']||r['date']||'';
+      const custName  = String(r['CustomerName']||r['Customer']||r['Name']||'Cash').trim();
+      const address   = String(r['Address']||'').trim();
+      const state     = String(r['State']||'').trim();
+      const stateCode = String(r['StateCode']||r['State Code']||'').trim();
+      const gstin     = String(r['GSTIN']||r['GSTIN/UDIN']||'').trim();
+      const useIGST   = String(r['UseIGST']||r['IGST']||'').toLowerCase()==='yes';
+
+      // Parse date
+      let formattedDate = '';
+      if (dateRaw) {
+        if (typeof dateRaw === 'number') {
+          const d = XLSX.SSF.parse_date_code(dateRaw);
+          formattedDate = `${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`;
+        } else {
+          const s = String(dateRaw).trim();
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+            const [yyyy,mm,dd] = s.split('-');
+            formattedDate = `${dd}/${mm}/${yyyy}`;
+          } else {
+            formattedDate = s;
+          }
+        }
+      }
+
+      // Parse item columns
+      const groups = {};
+      let hasItems = false;
+      let parseError = '';
+
+      for (let n=1; n<=10; n++) {
+        // Accept column names like: Item1Type, Item1 Type, item1type
+        const typeRaw = String(
+          r[`Item${n}Type`] || r[`Item${n} Type`] || r[`item${n}type`] || ''
+        ).trim();
+        if (!typeRaw) break; // no more items after first empty
+
+        const qty = parseInt(
+          r[`Item${n}Qty`]||r[`Item${n} Qty`]||r[`Item${n}Quantity`]||
+          r[`Item${n} Quantity`]||r[`item${n}qty`]||0
+        );
+        const rateIncl = parseFloat(
+          r[`Item${n}RateInclGST`]||r[`Item${n} RateInclGST`]||
+          r[`Item${n}Rate`]||r[`Item${n} Rate`]||r[`item${n}rate`]||0
+        );
+
+        if (qty <= 0) { parseError = `Item${n}: qty missing or 0`; break; }
+        if (rateIncl <= 0) { parseError = `Item${n}: rate missing or 0`; break; }
+
+        const meta = getProductMeta(typeRaw);
+        const key  = `${meta.value}_${rateIncl}`;
+        if (!groups[key]) groups[key] = {product:meta.value,hsn:meta.hsn,unit:meta.unit,qty:0,rateIncl};
+        groups[key].qty += qty;
+        hasItems = true;
+      }
+
+      // Determine status & calculate
+      let statusMsg = 'ok';
+      let calc = {rows:'',totalTaxable:0,totalCGST:0,totalSGST:0,totalIGST:0,grandTotal:0};
+
+      if (parseError)    { statusMsg = parseError; }
+      else if (!hasItems) { statusMsg = 'No items found'; }
+      else               { calc = calcTotals(groups, useIGST); }
+
+      const customerBlock = makeBillToHTML(custName, address, state, stateCode, gstin);
+      const totalInWords  = numberToWords(calc.grandTotal);
+      const billBodyHTML  = statusMsg==='ok'
+        ? assembleBillHTML(billNo, formattedDate, customerBlock, calc, totalInWords, useIGST)
+        : '';
+
+      const itemSummary = Object.values(groups)
+        .map(g=>`${g.qty}× ${g.product} @₹${g.rateIncl}`)
+        .join(', ') || '—';
+
+      window._batchResults.push({billNo, formattedDate, custName, billBodyHTML, statusMsg, itemSummary, grandTotal: calc.grandTotal});
+
+      // Table row
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${billNo||'—'}</td>
+        <td>${formattedDate||'—'}</td>
+        <td>${custName}</td>
+        <td style="font-size:11px;max-width:240px;word-break:break-word;">${itemSummary}</td>
+        <td>₹${calc.grandTotal.toFixed(2)}</td>
+        <td style="font-size:11px;">${useIGST?'IGST':'CGST+SGST'}</td>
+        <td><span class="${statusMsg==='ok'?'status-ok':'status-err'}">${statusMsg==='ok'?'✓ Ready':'✗ '+statusMsg}</span></td>
+        <td>${statusMsg==='ok'
+          ? `<button class="batch-dl-btn" data-idx="${i}" onclick="downloadBatchPDF(${i})">PDF ↓</button>`
+          : '—'}</td>
+      `;
+      document.getElementById("batchTableBody").appendChild(tr);
+    }
+
+    const okCount = window._batchResults.filter(r=>r.statusMsg==='ok').length;
+    document.getElementById("batchProgress").textContent =
+      `✓ ${okCount} of ${excelRows.length} bills ready.` +
+      (okCount < excelRows.length ? `  ⚠ ${excelRows.length-okCount} skipped (check item columns).` : '');
+  }
+
+  async function downloadBatchPDF(idx) {
+    const res = window._batchResults[idx];
+    if (!res || res.statusMsg!=='ok') return;
+    const btn = document.querySelector(`.batch-dl-btn[data-idx="${idx}"]`);
+    if (btn) { btn.disabled=true; btn.textContent='…'; }
+    try {
+      const tempDiv = document.getElementById("_batchTempRender");
+      tempDiv.innerHTML = `
+        <div style="text-align:center;margin-bottom:6px;">
+          <h2 style="font-size:34px;margin:0;">Anas Traders</h2>
+          <p style="margin:4px 0;font-size:14px;">
+            4760/2, Ground Floor, Jaipuriya building,<br>
+            Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
+            GSTIN/UIN: 07AGGPK5556M1ZX<br>
+            01145604564, 9899558755<br>
+            <strong>Tax Invoice</strong>
+          </p>
+        </div>
+        <hr style="margin:6px 0;">
+        ${res.billBodyHTML}`;
+      const blob = await renderToPDF(tempDiv);
+      await shareOrDownload(blob, `Invoice_${res.billNo||idx+1}.pdf`);
+    } catch(err) {
+      console.error(err);
+      alert('PDF generation failed: ' + err.message);
+    } finally {
+      if (btn) { btn.disabled=false; btn.textContent='PDF ↓'; }
+    }
+  }
+
+  function openBatchModal()  { document.getElementById("batchModal").classList.add("open"); }
+  function closeBatchModal() { document.getElementById("batchModal").classList.remove("open"); }
+
+  </script>
+</body>
+</html>
