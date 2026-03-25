@@ -219,7 +219,6 @@
     const billNo = document.querySelector("#billOutput strong").textContent.replace("Invoice No: ", "").trim();
     document.title = `Bill ${billNo}`;
     window.print();
-    setTimeout(() => { document.title = 'Bill Generator'; }, 1000);
   }
 
   function numberToWords(num) {
