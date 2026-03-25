@@ -217,7 +217,9 @@
     const next = current + 1;
     setCookie("lastInvoice", next);
     document.getElementById("invoiceNo").value = next;
+    document.title = `Bill ${current}`;
     window.print();
+    setTimeout(() => { document.title = 'Bill Generator'; }, 1000);
   }
 
   function numberToWords(num) {
