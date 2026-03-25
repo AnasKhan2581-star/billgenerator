@@ -5,7 +5,7 @@
   <link href="https://fonts.cdnfonts.com/css/royal-crescent" rel="stylesheet">
   <style>
     @media print {
-      body { padding: 0 !important; }
+      body { padding: 0 !important; background: white !important; }
       .billto-print-box {
         border: 1px solid #ccc !important;
         padding: 10px !important;
@@ -66,17 +66,14 @@
     .batch-dl-btn:disabled { background: #aaa; cursor: default; }
     .status-ok  { color: #2a7a2a; font-weight: bold; font-size: 12px; }
     .status-err { color: #c0392b; font-weight: bold; font-size: 12px; }
-    #batchCloseBtn {
-      margin-top: 20px; padding: 9px 24px;
-      background: #555; color: #fff;
-      border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
+    .batch-action-btn {
+      padding: 9px 20px; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 13px; margin-right: 10px;
     }
+    #batchCloseBtn { background: #555; }
     #batchCloseBtn:hover { background: #333; }
-    #_batchTempRender {
-      position: fixed; left: 0; top: 0;
-      width: 794px; font-family: Arial; background: white; padding: 32px;
-      z-index: 99998; opacity: 0; pointer-events: none;
-    }
+    #printAllBtn { background: #2a7a2a; }
+    #printAllBtn:hover { background: #1e5c1e; }
   </style>
 </head>
 <body style="font-family: Arial; padding: 32px; background: #f5f5f5;">
@@ -84,9 +81,6 @@
   <!-- Hidden batch file input -->
   <input type="file" id="batchFileInput" accept=".xlsx,.xls,.csv"
          style="display:none;" onchange="handleBatchFile(this)">
-
-  <!-- Off-screen render area for PDF generation -->
-  <div id="_batchTempRender"></div>
 
   <!-- Batch Results Modal -->
   <div id="batchModal">
@@ -106,13 +100,16 @@
               <th>Grand Total</th>
               <th>Tax Type</th>
               <th>Status</th>
-              <th>Download</th>
+              <th>Print / Save PDF</th>
             </tr>
           </thead>
           <tbody id="batchTableBody"></tbody>
         </table>
       </div>
-      <button id="batchCloseBtn" onclick="closeBatchModal()">Close</button>
+      <div style="margin-top:20px;">
+        <button id="printAllBtn" class="batch-action-btn" onclick="printAllBills()">🖨 Print All</button>
+        <button id="batchCloseBtn" class="batch-action-btn" onclick="closeBatchModal()">Close</button>
+      </div>
     </div>
   </div>
 
@@ -128,7 +125,6 @@
         Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
         GSTIN/UIN: 07AGGPK5556M1ZX<br>
         01145604564, 9899558755<br>
-        <!-- Triple-click "Tax Invoice" to open hidden batch uploader -->
         <strong id="taxInvoiceLabel" style="margin-top:3px;cursor:default;user-select:none;"> Tax Invoice</strong>
       </p>
     </div>
@@ -192,10 +188,6 @@
     </div>
   </div>
 
-  <!-- html2canvas (required by jsPDF .html()) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <!-- jsPDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <!-- SheetJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -336,11 +328,16 @@
       const current = parseInt(document.getElementById("invoiceNo").value)||2501;
       setCookie("lastInvoice", current+1);
       document.getElementById("invoiceNo").value = current+1;
-      const blob = await renderToPDF(billDiv);
-      await shareOrDownload(blob, `Invoice_${current+1}.pdf`);
+      // Open print dialog in new window — works on mobile share too
+      const html = buildPrintWindowHTML([window._lastBillData]);
+      const w = window.open('','_blank');
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(()=>{ w.print(); }, 600);
     } catch(err) {
       console.error(err);
-      alert('Could not share. PDF downloaded instead.');
+      alert('Could not share.');
     } finally {
       if (shareBtn) { shareBtn.disabled=false; shareBtn.textContent="Share Bill"; }
     }
@@ -388,8 +385,8 @@
         <td contenteditable="true" style="border:1px solid #ccc;padding:8px;background:#fff;">${hsn}</td>
         <td style="border:1px solid #ccc;padding:8px;text-align:center;">${qty}</td>
         <td style="border:1px solid #ccc;padding:8px;text-align:center;">${unit}</td>
-        <td style="border:1px solid #ccc;padding:8px;text-align:right;">₹${rateExcl.toFixed(2)}</td>
-        <td style="border:1px solid #ccc;padding:8px;text-align:right;">₹${totalExcl.toFixed(2)}</td>
+        <td style="border:1px solid #ccc;padding:8px;text-align:right;">&#8377;${rateExcl.toFixed(2)}</td>
+        <td style="border:1px solid #ccc;padding:8px;text-align:right;">&#8377;${totalExcl.toFixed(2)}</td>
       </tr>`;
       totalTaxable += totalExcl;
       if (useIGST) totalIGST += totalExcl*0.05;
@@ -422,11 +419,11 @@
         <tbody>${rows}</tbody>
       </table>
       <table style="width:100%;margin-top:20px;font-size:16px;">
-        <tr><td><strong>Taxable Amount</strong></td><td style="text-align:right;">₹${totalTaxable.toFixed(2)}</td></tr>
-        <tr><td>CGST 2.5%</td><td style="text-align:right;">₹${useIGST?'0.00':totalCGST.toFixed(2)}</td></tr>
-        <tr><td>SGST 2.5%</td><td style="text-align:right;">₹${useIGST?'0.00':totalSGST.toFixed(2)}</td></tr>
-        <tr><td>IGST 5%</td><td style="text-align:right;">₹${useIGST?totalIGST.toFixed(2):'0.00'}</td></tr>
-        <tr><td><strong>Grand Total</strong></td><td style="text-align:right;"><strong>₹${grandTotal.toFixed(2)}</strong></td></tr>
+        <tr><td><strong>Taxable Amount</strong></td><td style="text-align:right;">&#8377;${totalTaxable.toFixed(2)}</td></tr>
+        <tr><td>CGST 2.5%</td><td style="text-align:right;">&#8377;${useIGST?'0.00':totalCGST.toFixed(2)}</td></tr>
+        <tr><td>SGST 2.5%</td><td style="text-align:right;">&#8377;${useIGST?'0.00':totalSGST.toFixed(2)}</td></tr>
+        <tr><td>IGST 5%</td><td style="text-align:right;">&#8377;${useIGST?totalIGST.toFixed(2):'0.00'}</td></tr>
+        <tr><td><strong>Grand Total</strong></td><td style="text-align:right;"><strong>&#8377;${grandTotal.toFixed(2)}</strong></td></tr>
       </table>
       <p style="margin-top:30px;font-size:14px;">
         <strong>Terms &amp; Conditions:</strong><br>
@@ -444,64 +441,66 @@
       </div>`;
   }
 
-  async function renderToPDF(domNode) {
-    const canvas = await html2canvas(domNode, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false
-    });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const {jsPDF} = window.jspdf;
-    // A4 dimensions in mm: 210 x 297
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageW = 210;
-    const pageH = 297;
-    const margin = 10;
-    const usableW = pageW - margin * 2;
-    const imgW = canvas.width;
-    const imgH = canvas.height;
-    const ratio = usableW / (imgW / (canvas.width / usableW));
-    // scale image width to usable page width
-    const pdfImgW = usableW;
-    const pdfImgH = (imgH / imgW) * pdfImgW;
-    const usableH = pageH - margin * 2;
-    let yPos = 0;
-    let pageYOffset = margin;
-    let firstPage = true;
-    while (yPos < pdfImgH) {
-      if (!firstPage) { pdf.addPage(); pageYOffset = margin; }
-      const sliceH = Math.min(usableH, pdfImgH - yPos);
-      // crop the canvas slice
-      const sliceCanvas = document.createElement('canvas');
-      const scaleF = canvas.width / pdfImgW;
-      sliceCanvas.width  = canvas.width;
-      sliceCanvas.height = sliceH * scaleF;
-      const ctx = sliceCanvas.getContext('2d');
-      ctx.drawImage(canvas, 0, yPos * scaleF, canvas.width, sliceH * scaleF, 0, 0, canvas.width, sliceH * scaleF);
-      const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.95);
-      pdf.addImage(sliceData, 'JPEG', margin, pageYOffset, pdfImgW, sliceH);
-      yPos += sliceH;
-      firstPage = false;
-    }
-    return pdf.output('blob');
-  }
+  /* ── Build a full printable HTML page with one or many bills ──
+     Each bill gets the complete header + body, separated by page-break  */
+  function buildPrintWindowHTML(billsArray) {
+    const billPages = billsArray.map(b => `
+      <div class="bill-page">
+        <div style="text-align:center;position:relative;">
+          <span style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;">Duplicate</span>
+          <h2 style="font-family:Helvetica,Arial,sans-serif;font-size:38px;margin:0;">Anas Traders</h2>
+          <p style="margin:5px 0;font-size:16px;font-family:Arial,sans-serif;">
+            4760/2, Ground Floor, Jaipuriya building,<br>
+            Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
+            GSTIN/UIN: 07AGGPK5556M1ZX<br>
+            01145604564, 9899558755<br>
+            <strong style="margin-top:3px;">Tax Invoice</strong>
+          </p>
+        </div>
+        <div style="font-family:Arial,sans-serif;">
+          ${b.bodyHTML}
+        </div>
+      </div>
+    `).join('');
 
-  function directDownload(blob, fileName) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Bills</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: white; }
+  .bill-page {
+    width: 100%;
+    padding: 30px 40px;
+    page-break-after: always;
+    break-after: page;
   }
-
-  async function shareOrDownload(blob, fileName) {
-    const file = new File([blob], fileName, {type:'application/pdf'});
-    if (navigator.canShare && navigator.canShare({files:[file]})) {
-      try { await navigator.share({title:'Bill', text:'Your bill.', files:[file]}); return; }
-      catch(e) { console.warn(e); }
-    }
-    directDownload(blob, fileName);
+  .bill-page:last-child { page-break-after: avoid; break-after: avoid; }
+  .billto-print-box {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 6px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+  }
+  table { border-collapse: collapse; }
+  @media print {
+    body { margin: 0; }
+    .bill-page { padding: 14px 30px; }
+  }
+</style>
+</head>
+<body>
+${billPages}
+<script>
+  window.onload = function() {
+    setTimeout(function(){ window.print(); }, 400);
+  };
+<\/script>
+</body>
+</html>`;
   }
 
   /* ═══════════════════════════════════════
@@ -534,31 +533,16 @@
     input.value = '';
   }
 
-  /*
-    Expected Excel columns:
-    BillNo | Date | CustomerName | Address | State | StateCode | GSTIN | UseIGST
-    Item1Type | Item1Qty | Item1RateInclGST
-    Item2Type | Item2Qty | Item2RateInclGST
-    Item3Type | Item3Qty | Item3RateInclGST
-    ... up to Item10
-
-    Date formats accepted: DD/MM/YYYY  or  YYYY-MM-DD  or Excel date serial
-    UseIGST: write  yes  for IGST, leave blank or write no for CGST+SGST
-    Item types: Suit  /  Saree  /  Fabric  (case insensitive)
-  */
   function processBatch(excelRows) {
     openBatchModal();
     document.getElementById("batchTableBody").innerHTML = '';
     document.getElementById("batchProgress").textContent = `Processing ${excelRows.length} bill(s)…`;
-    document.getElementById("batchSubtitle").textContent =
-      'Triple-click "Tax Invoice" to load another file.';
-
+    document.getElementById("batchSubtitle").textContent = 'Triple-click "Tax Invoice" to load another file.';
     window._batchResults = [];
 
     for (let i=0; i<excelRows.length; i++) {
       const r = excelRows[i];
 
-      // Basic fields
       const billNo    = String(r['BillNo']||r['Bill No']||r['billno']||'').trim();
       const dateRaw   = r['Date']||r['date']||'';
       const custName  = String(r['CustomerName']||r['Customer']||r['Name']||'Cash').trim();
@@ -568,7 +552,6 @@
       const gstin     = String(r['GSTIN']||r['GSTIN/UDIN']||'').trim();
       const useIGST   = String(r['UseIGST']||r['IGST']||'').toLowerCase()==='yes';
 
-      // Parse date
       let formattedDate = '';
       if (dateRaw) {
         if (typeof dateRaw === 'number') {
@@ -585,30 +568,17 @@
         }
       }
 
-      // Parse item columns
       const groups = {};
       let hasItems = false;
       let parseError = '';
 
       for (let n=1; n<=10; n++) {
-        // Accept column names like: Item1Type, Item1 Type, item1type
-        const typeRaw = String(
-          r[`Item${n}Type`] || r[`Item${n} Type`] || r[`item${n}type`] || ''
-        ).trim();
-        if (!typeRaw) break; // no more items after first empty
-
-        const qty = parseInt(
-          r[`Item${n}Qty`]||r[`Item${n} Qty`]||r[`Item${n}Quantity`]||
-          r[`Item${n} Quantity`]||r[`item${n}qty`]||0
-        );
-        const rateIncl = parseFloat(
-          r[`Item${n}RateInclGST`]||r[`Item${n} RateInclGST`]||
-          r[`Item${n}Rate`]||r[`Item${n} Rate`]||r[`item${n}rate`]||0
-        );
-
-        if (qty <= 0) { parseError = `Item${n}: qty missing or 0`; break; }
+        const typeRaw = String(r[`Item${n}Type`]||r[`Item${n} Type`]||r[`item${n}type`]||'').trim();
+        if (!typeRaw) break;
+        const qty = parseInt(r[`Item${n}Qty`]||r[`Item${n} Qty`]||r[`Item${n}Quantity`]||r[`item${n}qty`]||0);
+        const rateIncl = parseFloat(r[`Item${n}RateInclGST`]||r[`Item${n} RateInclGST`]||r[`Item${n}Rate`]||r[`Item${n} Rate`]||r[`item${n}rate`]||0);
+        if (qty <= 0)      { parseError = `Item${n}: qty missing or 0`; break; }
         if (rateIncl <= 0) { parseError = `Item${n}: rate missing or 0`; break; }
-
         const meta = getProductMeta(typeRaw);
         const key  = `${meta.value}_${rateIncl}`;
         if (!groups[key]) groups[key] = {product:meta.value,hsn:meta.hsn,unit:meta.unit,qty:0,rateIncl};
@@ -616,27 +586,22 @@
         hasItems = true;
       }
 
-      // Determine status & calculate
       let statusMsg = 'ok';
       let calc = {rows:'',totalTaxable:0,totalCGST:0,totalSGST:0,totalIGST:0,grandTotal:0};
-
-      if (parseError)    { statusMsg = parseError; }
-      else if (!hasItems) { statusMsg = 'No items found'; }
-      else               { calc = calcTotals(groups, useIGST); }
+      if (parseError)     { statusMsg = parseError; }
+      else if (!hasItems)  { statusMsg = 'No items found'; }
+      else                 { calc = calcTotals(groups, useIGST); }
 
       const customerBlock = makeBillToHTML(custName, address, state, stateCode, gstin);
       const totalInWords  = numberToWords(calc.grandTotal);
-      const billBodyHTML  = statusMsg==='ok'
+      const bodyHTML = statusMsg==='ok'
         ? assembleBillHTML(billNo, formattedDate, customerBlock, calc, totalInWords, useIGST)
         : '';
 
-      const itemSummary = Object.values(groups)
-        .map(g=>`${g.qty}× ${g.product} @₹${g.rateIncl}`)
-        .join(', ') || '—';
+      const itemSummary = Object.values(groups).map(g=>`${g.qty}× ${g.product} @&#8377;${g.rateIncl}`).join(', ')||'—';
 
-      window._batchResults.push({billNo, formattedDate, custName, billBodyHTML, statusMsg, itemSummary, grandTotal: calc.grandTotal});
+      window._batchResults.push({ billNo, statusMsg, itemSummary, grandTotal: calc.grandTotal, useIGST, bodyHTML });
 
-      // Table row
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${i+1}</td>
@@ -644,11 +609,11 @@
         <td>${formattedDate||'—'}</td>
         <td>${custName}</td>
         <td style="font-size:11px;max-width:240px;word-break:break-word;">${itemSummary}</td>
-        <td>₹${calc.grandTotal.toFixed(2)}</td>
+        <td>&#8377;${calc.grandTotal.toFixed(2)}</td>
         <td style="font-size:11px;">${useIGST?'IGST':'CGST+SGST'}</td>
         <td><span class="${statusMsg==='ok'?'status-ok':'status-err'}">${statusMsg==='ok'?'✓ Ready':'✗ '+statusMsg}</span></td>
         <td>${statusMsg==='ok'
-          ? `<button class="batch-dl-btn" data-idx="${i}" onclick="downloadBatchPDF(${i})">PDF ↓</button>`
+          ? `<button class="batch-dl-btn" data-idx="${i}" onclick="printSingleBill(${i})">🖨 Print / PDF</button>`
           : '—'}</td>
       `;
       document.getElementById("batchTableBody").appendChild(tr);
@@ -657,37 +622,25 @@
     const okCount = window._batchResults.filter(r=>r.statusMsg==='ok').length;
     document.getElementById("batchProgress").textContent =
       `✓ ${okCount} of ${excelRows.length} bills ready.` +
-      (okCount < excelRows.length ? `  ⚠ ${excelRows.length-okCount} skipped (check item columns).` : '');
+      (okCount < excelRows.length ? `  ⚠ ${excelRows.length-okCount} skipped.` : '');
   }
 
-  async function downloadBatchPDF(idx) {
+  function printSingleBill(idx) {
     const res = window._batchResults[idx];
     if (!res || res.statusMsg!=='ok') return;
-    const btn = document.querySelector(`.batch-dl-btn[data-idx="${idx}"]`);
-    if (btn) { btn.disabled=true; btn.textContent='…'; }
-    try {
-      const tempDiv = document.getElementById("_batchTempRender");
-      tempDiv.innerHTML = `
-        <div style="text-align:center;margin-bottom:6px;">
-          <h2 style="font-size:34px;margin:0;">Anas Traders</h2>
-          <p style="margin:4px 0;font-size:14px;">
-            4760/2, Ground Floor, Jaipuriya building,<br>
-            Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
-            GSTIN/UIN: 07AGGPK5556M1ZX<br>
-            01145604564, 9899558755<br>
-            <strong>Tax Invoice</strong>
-          </p>
-        </div>
-        <hr style="margin:6px 0;">
-        ${res.billBodyHTML}`;
-      const blob = await renderToPDF(tempDiv);
-      directDownload(blob, `Invoice_${res.billNo||idx+1}.pdf`);
-    } catch(err) {
-      console.error(err);
-      alert('PDF generation failed: ' + err.message);
-    } finally {
-      if (btn) { btn.disabled=false; btn.textContent='PDF ↓'; }
-    }
+    const w = window.open('', '_blank');
+    w.document.write(buildPrintWindowHTML([res]));
+    w.document.close();
+    w.focus();
+  }
+
+  function printAllBills() {
+    const ready = (window._batchResults||[]).filter(r=>r.statusMsg==='ok');
+    if (!ready.length) { alert('No bills ready to print.'); return; }
+    const w = window.open('', '_blank');
+    w.document.write(buildPrintWindowHTML(ready));
+    w.document.close();
+    w.focus();
   }
 
   function openBatchModal()  { document.getElementById("batchModal").classList.add("open"); }
