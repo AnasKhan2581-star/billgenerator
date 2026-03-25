@@ -399,7 +399,7 @@
   function assembleBillHTML(invoiceNo, formattedDate, customerBlock, calc, totalInWords, useIGST) {
     const {rows, totalTaxable, totalCGST, totalSGST, totalIGST, grandTotal} = calc;
     return `
-      <div style="margin-top:2px;display:flex;justify-content:space-between;font-size:16px;">
+      <div style="margin-top:6px;display:flex;justify-content:space-between;font-size:16px;">
         <strong>Invoice No: ${invoiceNo}</strong>
         <strong>Date: ${formattedDate}</strong>
       </div>
@@ -457,7 +457,7 @@
             <strong style="margin-top:3px;">Tax Invoice</strong>
           </p>
         </div>
-        <div style="font-family:Arial,sans-serif;">
+        <div style="font-family:Arial,sans-serif;margin-top:6px;">
           ${b.bodyHTML}
         </div>
       </div>
