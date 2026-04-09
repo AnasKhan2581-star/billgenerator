@@ -183,7 +183,7 @@
          style="display:none;" onchange="handleBatchFile(this)">
 
   <!-- Hidden multi-bill HTML/PDF file input (NEW) -->
-  <input type="file" id="taxSummaryFileInput" accept=".html,.htm"
+  <input type="file" id="taxSummaryFileInput" accept=".pdf,.html,.htm"
          multiple style="display:none;" onchange="handleTaxSummaryFiles(this)">
 
   <!-- Batch Results Modal (existing) -->
@@ -329,7 +329,14 @@
     </div>
   </div>
 
-  <!-- SheetJS -->
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <script>
@@ -817,122 +824,89 @@ ${billPages}
     const results = [];
     let loaded = 0;
 
+    function onDone(parsed) {
+      results.push(parsed);
+      loaded++;
+      if (loaded === files.length) {
+        results.sort((a, b) => {
+          const na = parseInt(a.billNo) || 0;
+          const nb = parseInt(b.billNo) || 0;
+          if (na !== nb) return na - nb;
+          return a.billNo.localeCompare(b.billNo);
+        });
+        showTaxSummary(results);
+      }
+    }
+
     files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const parsed = parseBillHTML(e.target.result, file.name);
-        results.push(parsed);
-        loaded++;
-        if (loaded === files.length) {
-          // Sort by bill number numerically where possible
-          results.sort((a, b) => {
-            const na = parseInt(a.billNo) || 0;
-            const nb = parseInt(b.billNo) || 0;
-            if (na !== nb) return na - nb;
-            return a.billNo.localeCompare(b.billNo);
-          });
-          showTaxSummary(results);
-        }
-      };
-      reader.onerror = () => {
-        results.push({ billNo: file.name, date: '—', taxable: null, error: 'Could not read file' });
-        loaded++;
-        if (loaded === files.length) showTaxSummary(results);
-      };
-      reader.readAsText(file);
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'pdf') {
+        parseBillPDF(file).then(onDone).catch(err => {
+          onDone({ billNo: file.name.replace(/\.[^.]+$/, ''), date: '—', taxable: null, error: err.message });
+        });
+      } else {
+        const reader = new FileReader();
+        reader.onload = e => onDone(parseBillHTML(e.target.result, file.name));
+        reader.onerror = () => onDone({ billNo: file.name, date: '—', taxable: null, error: 'Could not read file' });
+        reader.readAsText(file);
+      }
     });
 
     input.value = '';
   }
 
-  /**
-   * Parse a saved bill HTML file.
-   * Looks for "Taxable Amount" row in the summary table and extracts the ₹ value.
-   * Also extracts Invoice No and Date from the bill header.
-   */
-  function parseBillHTML(htmlText, filename) {
+  async function parseBillPDF(file) {
+    const filename = file.name.replace(/\.[^.]+$/, '');
     try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, 'text/html');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-      // Extract Invoice No
-      let billNo = '—';
-      const allStrongs = doc.querySelectorAll('strong');
-      for (const el of allStrongs) {
-        const t = el.textContent.trim();
-        if (/^Invoice No:/i.test(t)) {
-          billNo = t.replace(/^Invoice No:\s*/i, '').trim();
-          break;
-        }
-      }
-      // Fallback: look in all text nodes for "Invoice No: XXXX"
-      if (billNo === '—') {
-        const bodyText = doc.body ? doc.body.innerHTML : htmlText;
-        const m = bodyText.match(/Invoice No[:\s]+([^\s<"&]+)/i);
-        if (m) billNo = m[1].trim();
-      }
-      // Last fallback: use filename minus extension
-      if (billNo === '—') billNo = filename.replace(/\.[^.]+$/, '');
-
-      // Extract Date
-      let date = '—';
-      for (const el of allStrongs) {
-        const t = el.textContent.trim();
-        if (/^Date:/i.test(t)) {
-          date = t.replace(/^Date:\s*/i, '').trim();
-          break;
-        }
-      }
-      if (date === '—') {
-        const m = (doc.body ? doc.body.innerHTML : htmlText).match(/Date[:\s]+([\d\/\-]+)/i);
-        if (m) date = m[1].trim();
-      }
-
-      // Extract Taxable Amount
-      // Strategy 1: find a <td> or <strong> with text "Taxable Amount",
-      // then get the sibling/next cell's value
-      let taxable = null;
-
-      const allTds = doc.querySelectorAll('td');
-      for (let i = 0; i < allTds.length; i++) {
-        const cellText = allTds[i].textContent.trim();
-        if (/^Taxable Amount$/i.test(cellText)) {
-          // Next sibling td in the same row
-          const nextTd = allTds[i].parentElement
-            ? allTds[i].parentElement.querySelector('td:last-child')
-            : allTds[i + 1];
-          if (nextTd) {
-            const raw = nextTd.textContent.replace(/[₹,\s]/g, '').trim();
-            const num = parseFloat(raw);
-            if (!isNaN(num)) { taxable = num; break; }
+      // Extract all text from all pages
+      let fullText = '';
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        // Join items; preserve line breaks by checking y-position jumps
+        let lastY = null;
+        for (const item of content.items) {
+          if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) {
+            fullText += '\n';
           }
-          // Try next td by index
-          if (taxable === null && allTds[i + 1]) {
-            const raw = allTds[i + 1].textContent.replace(/[₹,\s]/g, '').trim();
-            const num = parseFloat(raw);
-            if (!isNaN(num)) { taxable = num; break; }
-          }
+          fullText += item.str;
+          lastY = item.transform[5];
         }
+        fullText += '\n';
       }
 
-      // Strategy 2: regex on raw HTML as backup
-      if (taxable === null) {
-        const m = htmlText.match(/Taxable Amount[\s\S]{0,200}?&#8377;([\d,]+\.?\d*)/i);
-        if (m) {
-          const num = parseFloat(m[1].replace(/,/g, ''));
-          if (!isNaN(num)) taxable = num;
-        }
-      }
-
-      if (taxable === null) {
-        return { billNo, date, taxable: null, error: 'Taxable Amount not found' };
-      }
-
-      return { billNo, date, taxable, error: null };
-
+      return parseBillText(fullText, filename);
     } catch(err) {
-      return { billNo: filename, date: '—', taxable: null, error: err.message };
+      return { billNo: filename, date: '—', taxable: null, error: 'PDF parse error: ' + err.message };
     }
+  }
+
+  function parseBillText(text, fallbackName) {
+    // Invoice No
+    let billNo = fallbackName;
+    const invMatch = text.match(/Invoice\s*No[:\s.]+([^\s\n]+)/i);
+    if (invMatch) billNo = invMatch[1].trim().replace(/[^a-zA-Z0-9\-\/]/g, '');
+
+    // Date — handles DD/MM/YYYY or YYYY-MM-DD
+    let date = '—';
+    const dateMatch = text.match(/Date[:\s]+([\d]{1,2}[\/\-][\d]{1,2}[\/\-][\d]{2,4})/i);
+    if (dateMatch) date = dateMatch[1].trim();
+
+    // Taxable Amount — look for "Taxable Amount" followed by a number (with optional ₹, Rs, comma)
+    let taxable = null;
+    const taxMatch = text.match(/Taxable\s*Amount[\s\S]{0,60}?([\d,]+\.?\d{0,2})/i);
+    if (taxMatch) {
+      const num = parseFloat(taxMatch[1].replace(/,/g, ''));
+      if (!isNaN(num) && num > 0) taxable = num;
+    }
+
+    if (taxable === null) {
+      return { billNo, date, taxable: null, error: 'Taxable Amount not found in PDF' };
+    }
+    return { billNo, date, taxable, error: null };
   }
 
   function showTaxSummary(results) {
@@ -982,7 +956,16 @@ ${billPages}
     openTaxSummaryModal();
   }
 
-  function escHtml(str) {
+  function parseBillHTML(htmlText, filename) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const text = doc.body ? doc.body.innerText || doc.body.textContent : htmlText;
+      return parseBillText(text, filename.replace(/\.[^.]+$/, ''));
+    } catch(err) {
+      return { billNo: filename, date: '—', taxable: null, error: err.message };
+    }
+  }
     return String(str||'')
       .replace(/&/g,'&amp;').replace(/</g,'&lt;')
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
