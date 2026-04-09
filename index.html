@@ -74,15 +74,119 @@
     #batchCloseBtn:hover { background: #333; }
     #printAllBtn { background: #2a7a2a; }
     #printAllBtn:hover { background: #1e5c1e; }
+
+    /* ══════════════════════════════════════
+       TAXABLE SUMMARY MODAL (new feature)
+    ══════════════════════════════════════ */
+    #taxSummaryModal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 10000;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 50px;
+      overflow-y: auto;
+    }
+    #taxSummaryModal.open { display: flex; }
+    #taxSummaryBox {
+      background: #fff;
+      border-radius: 14px;
+      padding: 30px 36px 36px;
+      width: 95%;
+      max-width: 640px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+      font-family: Arial, sans-serif;
+      animation: fadeSlideIn 0.22s ease;
+    }
+    @keyframes fadeSlideIn {
+      from { opacity:0; transform: translateY(-18px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    #taxSummaryBox h3 {
+      margin: 0 0 4px;
+      font-size: 21px;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #taxSummarySubtitle { font-size: 12px; color: #999; margin-bottom: 18px; }
+    #taxSummaryTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    #taxSummaryTable thead tr {
+      background: #1a1a2e;
+      color: #fff;
+    }
+    #taxSummaryTable th {
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    #taxSummaryTable th:last-child,
+    #taxSummaryTable td:last-child { text-align: right; }
+    #taxSummaryTable td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #eee;
+      color: #222;
+    }
+    #taxSummaryTable tr:nth-child(even) td { background: #f8f9fc; }
+    #taxSummaryTable tr:hover td { background: #eef2ff; }
+    #taxSummaryTable .err-row td { color: #c0392b; font-style: italic; font-size: 12px; }
+    #taxSummaryGrandRow td {
+      background: #1a1a2e !important;
+      color: #fff !important;
+      font-weight: bold;
+      font-size: 15px;
+      border-bottom: none;
+      padding: 11px 14px;
+    }
+    #taxSummaryGrandRow td:last-child { color: #ffd700 !important; }
+    .tax-summary-close-btn {
+      margin-top: 22px;
+      padding: 10px 26px;
+      background: #1a1a2e;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 13px;
+      float: right;
+    }
+    .tax-summary-close-btn:hover { background: #2d2d5e; }
+    #taxSummaryStats {
+      display: flex;
+      gap: 18px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: #f0f4ff;
+      border: 1px solid #c5d0f0;
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: #334;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body style="font-family: Arial; padding: 32px; background: #f5f5f5;">
 
-  <!-- Hidden batch file input -->
+  <!-- Hidden batch file input (existing) -->
   <input type="file" id="batchFileInput" accept=".xlsx,.xls,.csv"
          style="display:none;" onchange="handleBatchFile(this)">
 
-  <!-- Batch Results Modal -->
+  <!-- Hidden multi-bill HTML/PDF file input (NEW) -->
+  <input type="file" id="taxSummaryFileInput" accept=".html,.htm"
+         multiple style="display:none;" onchange="handleTaxSummaryFiles(this)">
+
+  <!-- Batch Results Modal (existing) -->
   <div id="batchModal">
     <div id="batchModalBox">
       <h3>📋 Batch Bills</h3>
@@ -114,12 +218,49 @@
   </div>
 
   <!-- ══════════════════════════════════════
+       TAXABLE SUMMARY MODAL (NEW)
+  ══════════════════════════════════════ -->
+  <div id="taxSummaryModal">
+    <div id="taxSummaryBox">
+      <h3>🧾 Taxable Amount Summary</h3>
+      <div id="taxSummarySubtitle">Triple-click <strong>Anas Traders</strong> to load more bills.</div>
+      <div id="taxSummaryStats"></div>
+      <div style="overflow-x:auto;">
+        <table id="taxSummaryTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Bill No</th>
+              <th>Taxable Amount</th>
+            </tr>
+          </thead>
+          <tbody id="taxSummaryTableBody"></tbody>
+          <tfoot>
+            <tr id="taxSummaryInvoiceCountRow">
+              <td colspan="2" style="background:#f0f4ff;color:#334;font-size:13px;padding:9px 14px;border-bottom:none;">Total Invoices</td>
+              <td id="taxSummaryInvoiceCount" style="background:#f0f4ff;color:#334;font-weight:bold;font-size:13px;padding:9px 14px;border-bottom:none;">0</td>
+              <td style="background:#f0f4ff;border-bottom:none;"></td>
+            </tr>
+            <tr id="taxSummaryGrandRow">
+              <td colspan="3">Grand Total Taxable Amount</td>
+              <td id="taxSummaryGrandTotal">₹0.00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <button class="tax-summary-close-btn" onclick="closeTaxSummaryModal()">Close</button>
+      <div style="clear:both;"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
        ORIGINAL APP — COMPLETELY UNCHANGED
   ══════════════════════════════════════════ -->
   <div class="print-container" style="max-width:980px;margin:40px auto;background:white;padding:32px;border-radius:14px;">
     <div style="text-align:center;position:relative;">
       <span style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;">Duplicate</span>
-      <h2 style="font-family:'Helvetica',font-weight:bold,cursive;font-size:38px;margin:0;">Anas Traders</h2>
+      <h2 id="shopTitle" style="font-family:'Helvetica',font-weight:bold,cursive;font-size:38px;margin:0;cursor:default;user-select:none;">Anas Traders</h2>
       <p style="margin:5px 0;font-size:16px;">
         4760/2, Ground Floor, Jaipuriya building,<br>
         Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
@@ -221,7 +362,8 @@
     document.title = `Bill ${billNo}`;
     window.print();
     setTimeout(() => { document.title = 'Bill Generator'; }, 1000);
-}
+  }
+
   function numberToWords(num) {
     const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten',
       'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
@@ -256,6 +398,7 @@
     document.getElementById("w-checkbox").checked = true;
     toggleBillTo();
     setupBatchTrigger();
+    setupTaxSummaryTrigger(); // NEW
   };
 
   function confirmIGST(checkbox) {
@@ -330,7 +473,6 @@
       const current = parseInt(document.getElementById("invoiceNo").value)||2501;
       setCookie("lastInvoice", current+1);
       document.getElementById("invoiceNo").value = current+1;
-      // Open print dialog in new window — works on mobile share too
       const html = buildPrintWindowHTML([window._lastBillData]);
       const w = window.open('','_blank');
       w.document.write(html);
@@ -443,8 +585,6 @@
       </div>`;
   }
 
-  /* ── Build a full printable HTML page with one or many bills ──
-     Each bill gets the complete header + body, separated by page-break  */
   function buildPrintWindowHTML(billsArray) {
     const billPages = billsArray.map(b => `
       <div class="bill-page">
@@ -648,6 +788,208 @@ ${billPages}
 
   function openBatchModal()  { document.getElementById("batchModal").classList.add("open"); }
   function closeBatchModal() { document.getElementById("batchModal").classList.remove("open"); }
+
+
+  /* ═══════════════════════════════════════════════════════════════
+     NEW HIDDEN FEATURE — TAXABLE AMOUNT SUMMARY
+     Activate: triple-click "Anas Traders" (shop title)
+     Loads multiple saved bill HTML files from your PC,
+     parses taxable amounts, shows a summary table with grand total.
+  ═══════════════════════════════════════════════════════════════ */
+
+  function setupTaxSummaryTrigger() {
+    let clicks = 0, timer = null;
+    document.getElementById("shopTitle").addEventListener("click", () => {
+      clicks++;
+      if (clicks === 1) timer = setTimeout(() => { clicks = 0; }, 600);
+      if (clicks >= 3) {
+        clearTimeout(timer);
+        clicks = 0;
+        document.getElementById("taxSummaryFileInput").click();
+      }
+    });
+  }
+
+  function handleTaxSummaryFiles(input) {
+    const files = Array.from(input.files);
+    if (!files.length) return;
+
+    const results = [];
+    let loaded = 0;
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const parsed = parseBillHTML(e.target.result, file.name);
+        results.push(parsed);
+        loaded++;
+        if (loaded === files.length) {
+          // Sort by bill number numerically where possible
+          results.sort((a, b) => {
+            const na = parseInt(a.billNo) || 0;
+            const nb = parseInt(b.billNo) || 0;
+            if (na !== nb) return na - nb;
+            return a.billNo.localeCompare(b.billNo);
+          });
+          showTaxSummary(results);
+        }
+      };
+      reader.onerror = () => {
+        results.push({ billNo: file.name, date: '—', taxable: null, error: 'Could not read file' });
+        loaded++;
+        if (loaded === files.length) showTaxSummary(results);
+      };
+      reader.readAsText(file);
+    });
+
+    input.value = '';
+  }
+
+  /**
+   * Parse a saved bill HTML file.
+   * Looks for "Taxable Amount" row in the summary table and extracts the ₹ value.
+   * Also extracts Invoice No and Date from the bill header.
+   */
+  function parseBillHTML(htmlText, filename) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+
+      // Extract Invoice No
+      let billNo = '—';
+      const allStrongs = doc.querySelectorAll('strong');
+      for (const el of allStrongs) {
+        const t = el.textContent.trim();
+        if (/^Invoice No:/i.test(t)) {
+          billNo = t.replace(/^Invoice No:\s*/i, '').trim();
+          break;
+        }
+      }
+      // Fallback: look in all text nodes for "Invoice No: XXXX"
+      if (billNo === '—') {
+        const bodyText = doc.body ? doc.body.innerHTML : htmlText;
+        const m = bodyText.match(/Invoice No[:\s]+([^\s<"&]+)/i);
+        if (m) billNo = m[1].trim();
+      }
+      // Last fallback: use filename minus extension
+      if (billNo === '—') billNo = filename.replace(/\.[^.]+$/, '');
+
+      // Extract Date
+      let date = '—';
+      for (const el of allStrongs) {
+        const t = el.textContent.trim();
+        if (/^Date:/i.test(t)) {
+          date = t.replace(/^Date:\s*/i, '').trim();
+          break;
+        }
+      }
+      if (date === '—') {
+        const m = (doc.body ? doc.body.innerHTML : htmlText).match(/Date[:\s]+([\d\/\-]+)/i);
+        if (m) date = m[1].trim();
+      }
+
+      // Extract Taxable Amount
+      // Strategy 1: find a <td> or <strong> with text "Taxable Amount",
+      // then get the sibling/next cell's value
+      let taxable = null;
+
+      const allTds = doc.querySelectorAll('td');
+      for (let i = 0; i < allTds.length; i++) {
+        const cellText = allTds[i].textContent.trim();
+        if (/^Taxable Amount$/i.test(cellText)) {
+          // Next sibling td in the same row
+          const nextTd = allTds[i].parentElement
+            ? allTds[i].parentElement.querySelector('td:last-child')
+            : allTds[i + 1];
+          if (nextTd) {
+            const raw = nextTd.textContent.replace(/[₹,\s]/g, '').trim();
+            const num = parseFloat(raw);
+            if (!isNaN(num)) { taxable = num; break; }
+          }
+          // Try next td by index
+          if (taxable === null && allTds[i + 1]) {
+            const raw = allTds[i + 1].textContent.replace(/[₹,\s]/g, '').trim();
+            const num = parseFloat(raw);
+            if (!isNaN(num)) { taxable = num; break; }
+          }
+        }
+      }
+
+      // Strategy 2: regex on raw HTML as backup
+      if (taxable === null) {
+        const m = htmlText.match(/Taxable Amount[\s\S]{0,200}?&#8377;([\d,]+\.?\d*)/i);
+        if (m) {
+          const num = parseFloat(m[1].replace(/,/g, ''));
+          if (!isNaN(num)) taxable = num;
+        }
+      }
+
+      if (taxable === null) {
+        return { billNo, date, taxable: null, error: 'Taxable Amount not found' };
+      }
+
+      return { billNo, date, taxable, error: null };
+
+    } catch(err) {
+      return { billNo: filename, date: '—', taxable: null, error: err.message };
+    }
+  }
+
+  function showTaxSummary(results) {
+    const tbody = document.getElementById("taxSummaryTableBody");
+    tbody.innerHTML = '';
+
+    let grandTotal = 0;
+    let successCount = 0;
+    let errorCount = 0;
+
+    results.forEach((r, idx) => {
+      const tr = document.createElement('tr');
+      if (r.error) {
+        errorCount++;
+        tr.className = 'err-row';
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${escHtml(r.date)}</td>
+          <td>${escHtml(r.billNo)}</td>
+          <td style="color:#c0392b;">⚠ ${escHtml(r.error)}</td>
+        `;
+      } else {
+        successCount++;
+        grandTotal += r.taxable;
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${escHtml(r.date)}</td>
+          <td><strong>${escHtml(r.billNo)}</strong></td>
+          <td>₹${r.taxable.toFixed(2)}</td>
+        `;
+      }
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("taxSummaryGrandTotal").textContent = `₹${grandTotal.toFixed(2)}`;
+    document.getElementById("taxSummaryInvoiceCount").textContent = successCount;
+
+    // Stats pills
+    const statsDiv = document.getElementById("taxSummaryStats");
+    statsDiv.innerHTML = `
+      <span class="stat-pill">📄 ${results.length} file${results.length!==1?'s':''} loaded</span>
+      <span class="stat-pill">✅ ${successCount} parsed</span>
+      ${errorCount ? `<span class="stat-pill" style="background:#fff0f0;border-color:#f0b8b8;color:#900;">⚠ ${errorCount} failed</span>` : ''}
+      <span class="stat-pill" style="background:#fff8e1;border-color:#f0d070;">🧮 Total Taxable: ₹${grandTotal.toFixed(2)}</span>
+    `;
+
+    openTaxSummaryModal();
+  }
+
+  function escHtml(str) {
+    return String(str||'')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function openTaxSummaryModal()  { document.getElementById("taxSummaryModal").classList.add("open"); }
+  function closeTaxSummaryModal() { document.getElementById("taxSummaryModal").classList.remove("open"); }
 
   </script>
 </body>
