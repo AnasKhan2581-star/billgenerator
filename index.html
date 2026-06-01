@@ -210,6 +210,9 @@
     .bg-cust-toggle:hover { text-decoration: underline; }
     .bg-cust-details { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
     .bg-cust-details input { padding: 4px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 11px; }
+    .bg-payer { font-size: 12px; color: #334; }
+    .bg-parts { background: #fff3cd; color: #8a6d00; border-radius: 10px; padding: 1px 6px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+    .bg-payer-none { color: #bbb; }
   </style>
 </head>
 <body style="font-family: Arial; padding: 32px; background: #f5f5f5;">
@@ -331,6 +334,7 @@
             <tr>
               <th style="width:74px;">Inv No</th>
               <th style="width:104px;">Date</th>
+              <th style="width:140px;">Payer (statement)</th>
               <th style="width:150px;">Customer</th>
               <th>Items&nbsp;&nbsp;(product · qty · incl-rate)</th>
               <th style="width:48px;">IGST</th>
@@ -1124,12 +1128,12 @@ ${billPages}
     for (const c of raw) {
       const last = credits[credits.length - 1];
       if (last && last.date === c.date && c.name && last.name === c.name) {
-        last.amount += c.amount;
+        last.amount += c.amount; last.parts++;
       } else {
-        credits.push({ date: c.date, name: c.name, amount: c.amount });
+        credits.push({ date: c.date, name: c.name, amount: c.amount, parts: 1 });
       }
     }
-    return credits.map(c => ({ date: c.date, amount: c.amount }));
+    return credits;
   }
 
   /* ---- seeded RNG so each bill's mix is stable across re-renders ---- */
@@ -1226,6 +1230,7 @@ ${billPages}
       customer: (saved && saved.customer) ? saved.customer : 'Cash',
       bills: credits.map((c, i) => ({
         date: c.date, target: c.amount, useIGST: false,
+        payer: c.name || '', parts: c.parts || 1,
         items: null, _seed: 1000 + i * 7
       }))
     };
@@ -1301,6 +1306,9 @@ ${billPages}
           <span class="bg-inv">${invNo}</span>
         </td>
         <td><input type="text" class="bg-date" value="${bill.date||''}" onchange="bgFieldChange(${bi},'date',this.value)"></td>
+        <td>${bill.payer
+              ? `<span class="bg-payer">${bill.payer}</span>${bill.parts>1?` <span class="bg-parts" title="${bill.parts} part-payments merged">×${bill.parts}</span>`:''}`
+              : '<span class="bg-payer-none">—</span>'}</td>
         <td>
           <input type="text" class="bg-cust-name" placeholder="${bgState.customer||'Cash'}"
                  value="${c.name||''}" oninput="bgCustChange(${bi},'name',this.value)">
@@ -1373,7 +1381,7 @@ ${billPages}
     const prev = bgState.bills[bi-1], next = bgState.bills[bi];
     const date = (prev && prev.date) || (next && next.date) || '';
     const seed = 9000 + Math.round(amt);
-    bgState.bills.splice(bi, 0, { date, target:amt, useIGST: prev?prev.useIGST:false, items: autoFillItems(amt, seed), _seed:seed });
+    bgState.bills.splice(bi, 0, { date, target:amt, useIGST: prev?prev.useIGST:false, payer:'', parts:1, items: autoFillItems(amt, seed), _seed:seed });
     bgRender();
   }
 
