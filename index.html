@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
   <title>Bill Generator</title>
   <link href="https://fonts.cdnfonts.com/css/royal-crescent" rel="stylesheet">
   <style>
@@ -125,6 +126,89 @@
       cursor: pointer; font-size: 13px; float: right;
     }
     #taxSummaryCloseBtn:hover { background: #2d2d5e; }
+
+    /* ── Statement → Bill Grid Modal (NEW) ── */
+    #billGridModal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 10001;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 30px 0;
+      overflow-y: auto;
+    }
+    #billGridModal.open { display: flex; }
+    #billGridBox {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 28px 28px;
+      width: 97%;
+      max-width: 1180px;
+      margin-bottom: 40px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+      font-family: Arial, sans-serif;
+    }
+    #billGridBox h3 { margin: 0 0 4px; font-size: 20px; }
+    #billGridSubtitle { font-size: 12px; color: #888; margin-bottom: 14px; }
+    .bg-controls {
+      display: flex; flex-wrap: wrap; gap: 14px 22px;
+      background: #f7f8fb; border: 1px solid #e6e8ef;
+      border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .bg-field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #444; }
+    .bg-field label { font-weight: bold; font-size: 11px; color: #667; text-transform: uppercase; letter-spacing: .3px; }
+    .bg-field input[type=text], .bg-field input[type=number] {
+      padding: 6px 8px; border: 1px solid #ccd; border-radius: 5px; font-size: 13px;
+    }
+    .bg-rates input { min-width: 320px; }
+    .bg-recon {
+      display: flex; align-items: center; gap: 16px;
+      font-size: 14px; font-weight: bold; margin: 4px 0 14px;
+      padding: 10px 14px; border-radius: 8px;
+    }
+    .bg-recon.match { background: #eafbea; color: #1e6b1e; border: 1px solid #b7e3b7; }
+    .bg-recon.nomatch { background: #fdecea; color: #a3271b; border: 1px solid #f3c4bd; }
+    #billGridTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #billGridTable th {
+      background: #1a1a2e; color: #fff; border: 1px solid #2d2d4e;
+      padding: 8px 8px; text-align: left; white-space: nowrap; font-size: 12px;
+    }
+    #billGridTable td { border: 1px solid #d8dae3; padding: 6px 8px; vertical-align: top; }
+    #billGridTable tr:nth-child(even) td { background: #fafbfe; }
+    .bg-inv { font-weight: bold; font-size: 14px; color: #1a1a2e; white-space: nowrap; }
+    .bg-date { width: 96px; padding: 5px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 12px; }
+    .bg-target { width: 92px; padding: 5px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 13px; text-align: right; }
+    .bg-items { min-width: 360px; }
+    .bg-item-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .bg-item-row select { padding: 4px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 12px; }
+    .bg-item-row .bg-qty  { width: 56px; padding: 4px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 12px; text-align: center; }
+    .bg-item-row .bg-rate { width: 78px; padding: 4px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 12px; text-align: right; }
+    .bg-item-x { border: none; background: #f3d6d2; color: #a3271b; border-radius: 4px; cursor: pointer; width: 22px; height: 24px; font-weight: bold; }
+    .bg-additem { border: none; background: #e3e8f5; color: #2d3a66; border-radius: 4px; cursor: pointer; font-size: 11px; padding: 3px 8px; margin-top: 2px; }
+    .bg-gt { font-weight: bold; font-size: 14px; white-space: nowrap; text-align: right; }
+    .bg-badge { font-size: 11px; font-weight: bold; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+    .bg-badge.ok  { background: #d7f0d7; color: #1e6b1e; }
+    .bg-badge.bad { background: #fbd9d4; color: #a3271b; }
+    .bg-del { border: none; background: #e74c3c; color: #fff; border-radius: 4px; cursor: pointer; width: 28px; height: 28px; font-size: 14px; }
+    .bg-del:hover { background: #c0392b; }
+    .bg-insert {
+      display: block; width: 100%; border: none; background: transparent;
+      color: #1a73e8; cursor: pointer; font-size: 11px; padding: 2px 0; line-height: 1;
+    }
+    .bg-insert:hover { background: #eef4ff; }
+    .bg-actions { margin-top: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .bg-action-btn { padding: 9px 18px; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    #bgBuildBtn { background: #2a7a2a; } #bgBuildBtn:hover { background: #1e5c1e; }
+    #bgRefillBtn { background: #1a73e8; } #bgRefillBtn:hover { background: #1558b0; }
+    #bgAddEndBtn { background: #6b4fa0; } #bgAddEndBtn:hover { background: #543d80; }
+    #bgCloseBtn { background: #555; } #bgCloseBtn:hover { background: #333; }
+    .bg-chk { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #444; }
+    .bg-cust-name { width: 100%; padding: 5px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 12px; }
+    .bg-cust-toggle { border: none; background: transparent; color: #1a73e8; cursor: pointer; font-size: 11px; padding: 2px 0; }
+    .bg-cust-toggle:hover { text-decoration: underline; }
+    .bg-cust-details { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
+    .bg-cust-details input { padding: 4px 6px; border: 1px solid #ccd; border-radius: 4px; font-size: 11px; }
   </style>
 </head>
 <body style="font-family: Arial; padding: 32px; background: #f5f5f5;">
@@ -133,9 +217,13 @@
   <input type="file" id="batchFileInput" accept=".xlsx,.xls,.csv"
          style="display:none;" onchange="handleBatchFile(this)">
 
-  <!-- Hidden PDF summary file input (NEW) -->
+  <!-- Hidden PDF summary file input (legacy, now unused) -->
   <input type="file" id="taxSummaryFileInput" accept=".pdf,.html,.htm"
          multiple style="display:none;" onchange="handleTaxSummaryFiles(this)">
+
+  <!-- Hidden bank-statement file input (NEW) -->
+  <input type="file" id="statementFileInput" accept=".pdf"
+         style="display:none;" onchange="handleStatementFile(this)">
 
   <!-- Batch Results Modal -->
   <div id="batchModal">
@@ -198,6 +286,74 @@
       </div>
       <button id="taxSummaryCloseBtn" onclick="document.getElementById('taxSummaryModal').classList.remove('open')">Close</button>
       <div style="clear:both;"></div>
+    </div>
+  </div>
+
+  <!-- Statement → Bill Grid Modal (NEW) -->
+  <div id="billGridModal">
+    <div id="billGridBox">
+      <h3>🧾 Statement → Bills</h3>
+      <div id="billGridSubtitle">Triple-click "Anas Traders" to load a different statement.</div>
+
+      <div class="bg-controls">
+        <div class="bg-field bg-rates">
+          <label>Suit rates (incl. GST)</label>
+          <input type="text" id="bgSuitRates" oninput="bgRatesChanged()">
+        </div>
+        <div class="bg-field bg-rates">
+          <label>Saree rates (incl. GST)</label>
+          <input type="text" id="bgSareeRates" oninput="bgRatesChanged()">
+        </div>
+        <div class="bg-field">
+          <label>Fabric rates</label>
+          <input type="text" id="bgFabricRates" style="width:120px;" oninput="bgRatesChanged()">
+        </div>
+        <div class="bg-field">
+          <label>Suit value %</label>
+          <input type="number" id="bgSuitPct" style="width:70px;" min="0" max="100" oninput="bgState.suitPct=+this.value;bgSave()">
+        </div>
+        <div class="bg-field">
+          <label>Start Invoice No</label>
+          <input type="number" id="bgStartInv" style="width:100px;" oninput="bgStartChanged()">
+        </div>
+        <div class="bg-field">
+          <label>Customer</label>
+          <input type="text" id="bgCustomer" style="width:130px;" oninput="bgState.customer=this.value;bgSave()">
+        </div>
+      </div>
+
+      <div id="bgRecon" class="bg-recon nomatch"></div>
+
+      <div style="overflow-x:auto;">
+        <table id="billGridTable">
+          <thead>
+            <tr>
+              <th style="width:74px;">Inv No</th>
+              <th style="width:104px;">Date</th>
+              <th style="width:150px;">Customer</th>
+              <th>Items&nbsp;&nbsp;(product · qty · incl-rate)</th>
+              <th style="width:48px;">IGST</th>
+              <th style="width:96px;">Target</th>
+              <th style="width:110px;">Grand Total</th>
+              <th style="width:70px;">Match</th>
+              <th style="width:44px;"></th>
+            </tr>
+          </thead>
+          <tbody id="billGridBody"></tbody>
+        </table>
+      </div>
+
+      <datalist id="bgSuitList"></datalist>
+      <datalist id="bgSareeList"></datalist>
+      <datalist id="bgFabricList"></datalist>
+
+      <div class="bg-actions">
+        <button id="bgBuildBtn" class="bg-action-btn" onclick="bgBuildBills()">✓ Build Bills</button>
+        <button id="bgRefillBtn" class="bg-action-btn" onclick="bgRefillAll()">↻ Re-auto-fill all</button>
+        <button id="bgAddEndBtn" class="bg-action-btn" onclick="bgInsertBill(bgState.bills.length)">＋ Add bill at end</button>
+        <button id="bgCloseBtn" class="bg-action-btn" onclick="document.getElementById('billGridModal').classList.remove('open')">Close</button>
+        <label class="bg-chk"><input type="checkbox" id="bgUpdateLast"> Update last invoice no. after building</label>
+      </div>
     </div>
   </div>
 
@@ -754,7 +910,7 @@ ${billPages}
       if (clicks >= 3) {
         clearTimeout(timer);
         clicks = 0;
-        document.getElementById('taxSummaryFileInput').click();
+        document.getElementById('statementFileInput').click();
       }
     });
   }
@@ -862,6 +1018,395 @@ ${billPages}
     document.getElementById('taxSummaryCount').textContent = count;
     document.getElementById('taxSummaryGrandTotal').textContent = '₹' + grandTotal.toFixed(2);
     document.getElementById('taxSummaryModal').classList.add('open');
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     NEW FEATURE — BANK STATEMENT → EDITABLE BILL GRID → BATCH PRINT
+     Activate: triple-click "Anas Traders" (the h2 shop title)
+     Reuses calcTotals / assembleBillHTML / makeBillToHTML / numberToWords
+     and the existing batch-print modal (openBatchModal + printAll/printSingle).
+  ═══════════════════════════════════════════════════════════════ */
+
+  // Rates actually used across all existing bills (GST-inclusive), seeded as defaults.
+  const BG_SEED = {
+    suit:   [2200,2450,2500,2650,2850,3000,3100,3200,3450,3500,3600,3700,3750,4000,4150,4200,4300,4400,4700,4800,5000,5500,5600],
+    saree:  [600,700,750,800,850,860,900,925,950,995,1000,1100,1115,1170,1200,1250,1300,2000],
+    fabric: [95,100,105,110]
+  };
+  // Preferred (most-used) multiple-of-100 rates the auto-filler leans on for realistic bills.
+  const BG_PREF = {
+    suit:  [2500,3000,3500,4000,4200,4800,5000,5500],
+    saree: [800,900,1000,1100,1200]
+  };
+  const BG_LS_KEY = 'anasBillGridState';
+  const MONTHS = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+
+  let bgState = null;
+
+  /* ---- entry: file chosen ---- */
+  function handleStatementFile(input) {
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    parseStatementPDF(file)
+      .then(credits => {
+        if (!credits.length) { alert('No credit (Deposit) transactions found in this statement.'); return; }
+        openBillGrid(credits);
+      })
+      .catch(err => { console.error(err); alert('Could not read statement: ' + err.message); });
+  }
+
+  /* ---- parse statement, return ordered list of credits {date, amount} ---- */
+  async function parseStatementPDF(file) {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      let lastY = null;
+      for (const item of content.items) {
+        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 3) text += '\n';
+        text += item.str + ' ';
+        lastY = item.transform[5];
+      }
+      text += '\n';
+    }
+    return extractCredits(text);
+  }
+
+  // Credits identified by running-balance going UP. Robust vs. column ambiguity.
+  function extractCredits(text) {
+    const numRe = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;          // 1,23,456.78
+    const dateRe = /\b(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})\b/;
+    const toNum = s => parseFloat(s.replace(/,/g, ''));
+
+    // Opening balance seed
+    let prevBal = null;
+    const openM = text.match(/Opening\s+Balance[\s\S]*?(\d{1,3}(?:,\d{2,3})*\.\d{2})/i);
+    if (openM) prevBal = toNum(openM[1]);
+
+    const credits = [];
+    const lines = text.split('\n');
+    let curDate = '';
+    for (const line of lines) {
+      const dM = line.match(dateRe);
+      if (dM) {
+        const mm = MONTHS[dM[2].toLowerCase().slice(0,3)] || '01';
+        curDate = `${String(dM[1]).padStart(2,'0')}/${mm}/${dM[3]}`;
+      }
+      const nums = line.match(numRe);
+      if (!nums || nums.length < 2) continue;          // need at least amount + balance
+      const bal = toNum(nums[nums.length - 1]);         // trailing number = running balance
+      if (prevBal === null) { prevBal = bal; continue; }
+      const delta = +(bal - prevBal).toFixed(2);
+      if (delta > 0.001) credits.push({ date: curDate, amount: Math.round(delta) });
+      prevBal = bal;
+    }
+    return credits;
+  }
+
+  /* ---- seeded RNG so each bill's mix is stable across re-renders ---- */
+  function bgRng(seed) {
+    let t = (seed >>> 0) || 1;
+    return function() {
+      t += 0x6D2B79F5;
+      let x = Math.imul(t ^ (t >>> 15), 1 | t);
+      x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const bgPick = (arr, rnd) => arr[Math.floor(rnd() * arr.length)];
+
+  /* ---- AUTO-FILL: items summing EXACTLY to target, ~suitPct% suit value ---- */
+  function autoFillItems(target, seed) {
+    target = Math.round(target);
+    const rnd = bgRng(seed);
+    const suitPct = (bgState ? bgState.suitPct : 30) / 100;
+    const suitPool  = (BG_PREF.suit.filter(r => bgState.rates.suit.includes(r)));
+    const sareePool = (BG_PREF.saree.filter(r => bgState.rates.saree.includes(r)));
+    const suits  = suitPool.length  ? suitPool  : bgState.rates.suit.filter(r => r % 100 === 0);
+    const sarees = sareePool.length ? sareePool : bgState.rates.saree.filter(r => r % 100 === 0);
+    const items = [];
+
+    let rem = target;
+    // suits ≈ suitPct of target value. Only on bills big enough that the cheapest
+    // suit stays under ~45% of the bill, so small bills are saree+fabric only.
+    const minSuit = suits.length ? Math.min(...suits) : Infinity;
+    if (suits.length && target >= minSuit / 0.45) {
+      const suitBudget = target * suitPct, cap = target * 0.45;
+      let suitUsed = 0, guard = 0;
+      while (guard++ < 5) {
+        if (suitUsed > 0 && suitBudget - suitUsed < minSuit) break;   // close enough to budget
+        const ceil = Math.min(cap - suitUsed, rem - 200);             // leave room for saree+fabric
+        const cand = suits.filter(r => r <= ceil);
+        if (!cand.length) break;
+        const near = cand.filter(r => r <= Math.max(suitBudget - suitUsed, minSuit) * 1.2);
+        const r = bgPick(near.length ? near : cand, rnd);
+        items.push({ type:'Unstitched Suit', qty:1, rate:r });
+        suitUsed += r; rem -= r;
+      }
+    }
+    // 3) sarees fill most of the rest, keeping rem closeable by fabric@100
+    if (sarees.length) {
+      let guard = 0;
+      while (rem >= Math.min(...sarees) + 100 && guard++ < 60) {
+        const cand = sarees.filter(r => r <= rem - 100);
+        if (!cand.length) break;
+        const r = bgPick(cand, rnd);
+        const ex = items.find(it => it.type==='Saree' && it.rate===r);
+        if (ex) ex.qty++; else items.push({ type:'Saree', qty:1, rate:r });
+        rem -= r;
+      }
+    }
+    // 4) close exactly
+    if (rem > 0) {
+      if (rem % 100 === 0) {
+        items.push({ type:'Fabric', qty: rem/100, rate:100 });
+      } else {
+        // odd leftover (e.g. ₹650, ₹50): a single Saree priced exactly closes it
+        const ex = items.find(it => it.type==='Saree' && it.rate===rem);
+        if (ex) ex.qty++; else items.push({ type:'Saree', qty:1, rate:rem });
+      }
+    }
+    if (!items.length) items.push({ type:'Saree', qty:1, rate:target });
+    return items;
+  }
+
+  /* ---- build & open the grid ---- */
+  function openBillGrid(credits) {
+    const saved = bgLoad();
+    const cookieInv = parseInt(getCookie('lastInvoice')) || 2500;
+    bgState = {
+      rates: (saved && saved.rates) ? saved.rates : JSON.parse(JSON.stringify(BG_SEED)),
+      suitPct: (saved && saved.suitPct != null) ? saved.suitPct : 30,
+      startInv: (saved && saved.startInv) ? saved.startInv : (cookieInv + 1),
+      customer: (saved && saved.customer) ? saved.customer : 'Cash',
+      bills: credits.map((c, i) => ({
+        date: c.date, target: c.amount, useIGST: false,
+        items: null, _seed: 1000 + i * 7
+      }))
+    };
+    bgState.bills.forEach(b => { b.items = autoFillItems(b.target, b._seed); });
+
+    document.getElementById('bgSuitRates').value   = bgState.rates.suit.join(', ');
+    document.getElementById('bgSareeRates').value  = bgState.rates.saree.join(', ');
+    document.getElementById('bgFabricRates').value = bgState.rates.fabric.join(', ');
+    document.getElementById('bgSuitPct').value     = bgState.suitPct;
+    document.getElementById('bgStartInv').value    = bgState.startInv;
+    document.getElementById('bgCustomer').value    = bgState.customer;
+
+    bgRender();
+    document.getElementById('billGridModal').classList.add('open');
+  }
+
+  function bgDatalists() {
+    const fill = (id, arr) => {
+      document.getElementById(id).innerHTML = arr.map(r => `<option value="${r}">`).join('');
+    };
+    fill('bgSuitList', bgState.rates.suit);
+    fill('bgSareeList', bgState.rates.saree);
+    fill('bgFabricList', bgState.rates.fabric);
+  }
+
+  function bgItemGroups(bill) {
+    const groups = {};
+    for (const it of bill.items) {
+      const qty = parseInt(it.qty), rate = parseFloat(it.rate);
+      if (!qty || !rate || qty <= 0 || rate <= 0) continue;
+      const meta = getProductMeta(it.type);
+      const key = `${meta.value}_${rate}`;
+      if (!groups[key]) groups[key] = { product:meta.value, hsn:meta.hsn, unit:meta.unit, qty:0, rateIncl:rate };
+      groups[key].qty += qty;
+    }
+    return groups;
+  }
+
+  function bgRender() {
+    bgDatalists();
+    const tbody = document.getElementById('billGridBody');
+    tbody.innerHTML = '';
+    let sumGT = 0, sumTarget = 0;
+
+    bgState.bills.forEach((bill, bi) => {
+      const invNo = bgState.startInv + bi;
+      const groups = bgItemGroups(bill);
+      const gt = calcTotals(groups, bill.useIGST).grandTotal;
+      const matched = Math.abs(gt - bill.target) < 0.5;
+      sumGT += gt; sumTarget += (parseFloat(bill.target) || 0);
+
+      const c = bill.cust || {};
+      const showCust = !!(bill._showCust || c.address || c.state || c.stateCode || c.gstin);
+
+      const listFor = t => t==='Unstitched Suit' ? 'bgSuitList' : t==='Saree' ? 'bgSareeList' : 'bgFabricList';
+      const itemsHTML = bill.items.map((it, ii) => `
+        <div class="bg-item-row">
+          <select onchange="bgItemChange(${bi},${ii},'type',this.value)">
+            <option value="Unstitched Suit" ${it.type==='Unstitched Suit'?'selected':''}>Suit</option>
+            <option value="Saree" ${it.type==='Saree'?'selected':''}>Saree</option>
+            <option value="Fabric" ${it.type==='Fabric'?'selected':''}>Fabric</option>
+          </select>
+          <input type="number" class="bg-qty" min="1" value="${it.qty}" onchange="bgItemChange(${bi},${ii},'qty',this.value)">
+          <span style="color:#999;">×</span>
+          <input type="number" class="bg-rate" min="0" step="1" list="${listFor(it.type)}" value="${it.rate}" onchange="bgItemChange(${bi},${ii},'rate',this.value)">
+          <button class="bg-item-x" title="remove item" onclick="bgItemRemove(${bi},${ii})">×</button>
+        </div>`).join('');
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <button class="bg-insert" title="insert a bill above" onclick="bgInsertBill(${bi})">＋ insert</button>
+          <span class="bg-inv">${invNo}</span>
+        </td>
+        <td><input type="text" class="bg-date" value="${bill.date||''}" onchange="bgFieldChange(${bi},'date',this.value)"></td>
+        <td>
+          <input type="text" class="bg-cust-name" placeholder="${bgState.customer||'Cash'}"
+                 value="${c.name||''}" oninput="bgCustChange(${bi},'name',this.value)">
+          <button class="bg-cust-toggle" onclick="bgCustToggle(${bi})">${showCust?'▴ hide details':'▾ full details'}</button>
+          <div class="bg-cust-details" style="display:${showCust?'flex':'none'};">
+            <input type="text" placeholder="Address" value="${c.address||''}" oninput="bgCustChange(${bi},'address',this.value)">
+            <input type="text" placeholder="State" value="${c.state||''}" oninput="bgCustChange(${bi},'state',this.value)">
+            <input type="text" placeholder="State Code" value="${c.stateCode||''}" oninput="bgCustChange(${bi},'stateCode',this.value)">
+            <input type="text" placeholder="GSTIN/UDIN" value="${c.gstin||''}" oninput="bgCustChange(${bi},'gstin',this.value)">
+          </div>
+        </td>
+        <td class="bg-items">
+          ${itemsHTML}
+          <button class="bg-additem" onclick="bgItemAdd(${bi})">＋ item</button>
+        </td>
+        <td style="text-align:center;"><input type="checkbox" ${bill.useIGST?'checked':''} onchange="bgFieldChange(${bi},'useIGST',this.checked)"></td>
+        <td><input type="number" class="bg-target" value="${bill.target}" onchange="bgFieldChange(${bi},'target',this.value)"></td>
+        <td class="bg-gt">&#8377;${gt.toFixed(2)}</td>
+        <td style="text-align:center;"><span class="bg-badge ${matched?'ok':'bad'}">${matched?'✓':'✗ '+(gt>bill.target?'+':'')+(gt-bill.target).toFixed(0)}</span></td>
+        <td style="text-align:center;"><button class="bg-del" title="delete bill" onclick="bgDeleteBill(${bi})">🗑</button></td>`;
+      tbody.appendChild(tr);
+    });
+
+    const allMatch = Math.abs(sumGT - sumTarget) < 0.5 && bgState.bills.every((b,bi)=>{
+      return Math.abs(calcTotals(bgItemGroups(b), b.useIGST).grandTotal - b.target) < 0.5;
+    });
+    const recon = document.getElementById('bgRecon');
+    recon.className = 'bg-recon ' + (allMatch ? 'match' : 'nomatch');
+    recon.innerHTML =
+      `<span>Bills: <b>${bgState.bills.length}</b></span>` +
+      `<span>Σ Grand Total: <b>&#8377;${sumGT.toFixed(2)}</b></span>` +
+      `<span>Σ Statement Credits: <b>&#8377;${sumTarget.toFixed(2)}</b></span>` +
+      `<span>${allMatch ? '✓ Reconciled — every bill matches its credit' : '✗ '+'Difference &#8377;'+(sumGT-sumTarget).toFixed(2)+' — check ✗ rows'}</span>`;
+    bgSave();
+  }
+
+  /* ---- edit handlers ---- */
+  function bgItemChange(bi, ii, field, val) {
+    const it = bgState.bills[bi].items[ii];
+    it[field] = (field==='type') ? val : (parseFloat(val) || 0);
+    bgRender();
+  }
+  function bgItemRemove(bi, ii) { bgState.bills[bi].items.splice(ii,1); bgRender(); }
+  function bgItemAdd(bi)        { bgState.bills[bi].items.push({type:'Saree',qty:1,rate:bgState.rates.saree[0]||900}); bgRender(); }
+  function bgFieldChange(bi, field, val) {
+    if (field==='target') val = parseFloat(val) || 0;
+    bgState.bills[bi][field] = val;
+    bgRender();
+  }
+  function bgDeleteBill(bi) { bgState.bills.splice(bi,1); bgRender(); }
+
+  // Per-bill customer override. Empty name falls back to the global customer ("Cash").
+  // Customer fields don't affect totals, so we save without a full re-render (keeps focus).
+  function bgCustChange(bi, field, val) {
+    if (!bgState.bills[bi].cust) bgState.bills[bi].cust = {};
+    bgState.bills[bi].cust[field] = val;
+    bgSave();
+  }
+  function bgCustToggle(bi) {
+    bgState.bills[bi]._showCust = !bgState.bills[bi]._showCust;
+    bgRender();
+  }
+
+  function bgInsertBill(bi) {
+    const ans = prompt('Target amount (incl. GST) for the new bill:', '');
+    if (ans === null) return;
+    const amt = Math.round(parseFloat(ans));
+    if (!amt || amt <= 0) { alert('Enter a valid amount.'); return; }
+    // date between neighbours (fallback to a neighbour's date)
+    const prev = bgState.bills[bi-1], next = bgState.bills[bi];
+    const date = (prev && prev.date) || (next && next.date) || '';
+    const seed = 9000 + Math.round(amt);
+    bgState.bills.splice(bi, 0, { date, target:amt, useIGST: prev?prev.useIGST:false, items: autoFillItems(amt, seed), _seed:seed });
+    bgRender();
+  }
+
+  function bgRefillAll() {
+    if (!confirm('Re-generate items for ALL bills from their targets? Manual edits will be lost.')) return;
+    bgState.bills.forEach((b,i) => { b.items = autoFillItems(b.target, b._seed || (1000+i*7)); });
+    bgRender();
+  }
+
+  /* ---- header control changes ---- */
+  function bgParseRates(str) {
+    return [...new Set(str.split(/[, ]+/).map(s=>parseInt(s)).filter(n=>n>0))].sort((a,b)=>a-b);
+  }
+  function bgRatesChanged() {
+    bgState.rates.suit   = bgParseRates(document.getElementById('bgSuitRates').value);
+    bgState.rates.saree  = bgParseRates(document.getElementById('bgSareeRates').value);
+    bgState.rates.fabric = bgParseRates(document.getElementById('bgFabricRates').value);
+    bgDatalists(); bgSave();
+  }
+  function bgStartChanged() { bgState.startInv = parseInt(document.getElementById('bgStartInv').value) || bgState.startInv; bgRender(); }
+
+  /* ---- persistence ---- */
+  function bgSave() { try { localStorage.setItem(BG_LS_KEY, JSON.stringify(bgState)); } catch(e){} }
+  function bgLoad() { try { return JSON.parse(localStorage.getItem(BG_LS_KEY)); } catch(e){ return null; } }
+
+  /* ---- build → feed existing batch-print modal ---- */
+  function bgBuildBills() {
+    const ready = [];
+    let skipped = 0;
+    bgState.bills.forEach((bill, bi) => {
+      const invNo = bgState.startInv + bi;
+      const groups = bgItemGroups(bill);
+      if (!Object.keys(groups).length) { skipped++; return; }
+      const calc = calcTotals(groups, bill.useIGST);
+      const cu = bill.cust || {};
+      const custName = (cu.name && cu.name.trim()) || bgState.customer || 'Cash';
+      const customerBlock = makeBillToHTML(custName, cu.address||'', cu.state||'', cu.stateCode||'', cu.gstin||'');
+      const words = numberToWords(calc.grandTotal);
+      const bodyHTML = assembleBillHTML(invNo, bill.date || '', customerBlock, calc, words, bill.useIGST);
+      const itemSummary = Object.values(groups).map(g=>`${g.qty}× ${g.product} @&#8377;${g.rateIncl}`).join(', ') || '—';
+      ready.push({ billNo:String(invNo), date:bill.date||'—', custName, statusMsg:'ok', itemSummary, grandTotal:calc.grandTotal, useIGST:bill.useIGST, bodyHTML });
+    });
+    if (!ready.length) { alert('No bills with valid items to build.'); return; }
+
+    if (document.getElementById('bgUpdateLast').checked) {
+      const lastInv = bgState.startInv + bgState.bills.length - 1;
+      setCookie('lastInvoice', lastInv + 1);
+      document.getElementById('invoiceNo').value = lastInv + 1;
+    }
+
+    window._batchResults = ready;
+    openBatchModal();
+    document.getElementById('batchTableBody').innerHTML = '';
+    document.getElementById('batchSubtitle').textContent = 'Built from bank statement. Print all, or print each bill individually.';
+    document.getElementById('batchProgress').textContent =
+      `✓ ${ready.length} bill(s) ready.` + (skipped ? `  ⚠ ${skipped} skipped (no items).` : '');
+    ready.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${r.billNo}</td>
+        <td>${r.date||'—'}</td>
+        <td>${r.custName||bgState.customer||'Cash'}</td>
+        <td style="font-size:11px;max-width:240px;word-break:break-word;">${r.itemSummary}</td>
+        <td>&#8377;${r.grandTotal.toFixed(2)}</td>
+        <td style="font-size:11px;">${r.useIGST?'IGST':'CGST+SGST'}</td>
+        <td><span class="status-ok">✓ Ready</span></td>
+        <td><button class="batch-dl-btn" onclick="printSingleBill(${i})">🖨 Print / PDF</button></td>`;
+      document.getElementById('batchTableBody').appendChild(tr);
+    });
+    document.getElementById('billGridModal').classList.remove('open');
   }
 
   </script>
