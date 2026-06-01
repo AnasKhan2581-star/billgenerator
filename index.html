@@ -1080,7 +1080,16 @@ ${billPages}
     return extractCredits(text);
   }
 
+  // Counterparty (sender) name from a transaction description, e.g.
+  // "UPI/SHARIYA AYAZ/611.../UPI" → "SHARIYA AYAZ". '' if none found.
+  function bgCounterpartyName(s) {
+    const m = (s||'').match(/(?:UPI|IMPS|NEFT|RTGS|IMT|MB|IB)\/\s*([A-Za-z][A-Za-z.&' ]+?)\s*\//);
+    return m ? m[1].toUpperCase().replace(/\s+/g, ' ').trim() : '';
+  }
+
   // Credits identified by running-balance going UP. Robust vs. column ambiguity.
+  // Consecutive credits on the SAME date from the SAME sender are part-payments
+  // for one sale → merged into a single bill with the combined amount.
   function extractCredits(text) {
     const numRe = /\d{1,3}(?:,\d{2,3})*\.\d{2}/g;          // 1,23,456.78
     const dateRe = /\b(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})\b/;
@@ -1091,10 +1100,11 @@ ${billPages}
     const openM = text.match(/Opening\s+Balance[\s\S]*?(\d{1,3}(?:,\d{2,3})*\.\d{2})/i);
     if (openM) prevBal = toNum(openM[1]);
 
-    const credits = [];
+    const raw = [];
     const lines = text.split('\n');
-    let curDate = '';
+    let curDate = '', buf = '';
     for (const line of lines) {
+      buf += ' ' + line;                                // accumulate description text
       const dM = line.match(dateRe);
       if (dM) {
         const mm = MONTHS[dM[2].toLowerCase().slice(0,3)] || '01';
@@ -1103,12 +1113,23 @@ ${billPages}
       const nums = line.match(numRe);
       if (!nums || nums.length < 2) continue;          // need at least amount + balance
       const bal = toNum(nums[nums.length - 1]);         // trailing number = running balance
-      if (prevBal === null) { prevBal = bal; continue; }
+      if (prevBal === null) { prevBal = bal; buf = ''; continue; }
       const delta = +(bal - prevBal).toFixed(2);
-      if (delta > 0.001) credits.push({ date: curDate, amount: Math.round(delta) });
-      prevBal = bal;
+      if (delta > 0.001) raw.push({ date: curDate, name: bgCounterpartyName(buf), amount: Math.round(delta) });
+      prevBal = bal; buf = '';
     }
-    return credits;
+
+    // Merge consecutive same-date, same-sender part payments
+    const credits = [];
+    for (const c of raw) {
+      const last = credits[credits.length - 1];
+      if (last && last.date === c.date && c.name && last.name === c.name) {
+        last.amount += c.amount;
+      } else {
+        credits.push({ date: c.date, name: c.name, amount: c.amount });
+      }
+    }
+    return credits.map(c => ({ date: c.date, amount: c.amount }));
   }
 
   /* ---- seeded RNG so each bill's mix is stable across re-renders ---- */
