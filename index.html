@@ -193,10 +193,11 @@
     .bg-del { border: none; background: #e74c3c; color: #fff; border-radius: 4px; cursor: pointer; width: 28px; height: 28px; font-size: 14px; }
     .bg-del:hover { background: #c0392b; }
     .bg-insert {
-      display: block; width: 100%; border: none; background: transparent;
-      color: #1a73e8; cursor: pointer; font-size: 11px; padding: 2px 0; line-height: 1;
+      display: block; margin: 0 auto 4px; width: 22px; height: 22px;
+      border: 1px solid #cdd8f0; background: #eef4ff; color: #1a73e8;
+      border-radius: 50%; cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
     }
-    .bg-insert:hover { background: #eef4ff; }
+    .bg-insert:hover { background: #1a73e8; color: #fff; }
     .bg-actions { margin-top: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .bg-action-btn { padding: 9px 18px; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
     #bgBuildBtn { background: #2a7a2a; } #bgBuildBtn:hover { background: #1e5c1e; }
@@ -1122,59 +1123,75 @@ ${billPages}
   }
   const bgPick = (arr, rnd) => arr[Math.floor(rnd() * arr.length)];
 
-  /* ---- AUTO-FILL: items summing EXACTLY to target, ~suitPct% suit value ---- */
+  /* ---- AUTO-FILL: items summing EXACTLY to target ----
+     Keeps it to 3 line items (suit? + saree + fabric), or 4 for big bills
+     (≥ ₹15,000). Quantities, not extra rates, carry the value — like real bills. */
+  function bgMerge(items) {
+    const out = [];
+    for (const it of items) {
+      if (it.qty <= 0) continue;
+      const ex = out.find(o => o.type === it.type && o.rate === it.rate);
+      if (ex) ex.qty += it.qty; else out.push({ type:it.type, qty:it.qty, rate:it.rate });
+    }
+    return out;
+  }
+
+  // Compose a multiple-of-100 amount M into ≤ L line items (one optional suit,
+  // 1–2 saree lines, one fabric line that closes it exactly).
+  function bgComposeMult100(M, L, rnd, suits, sarees) {
+    const items = []; let rem = M, lines = L;
+    const minSuit = suits.length ? Math.min(...suits) : Infinity;
+    const suitPct = (bgState ? bgState.suitPct : 30) / 100;
+    // SUIT — one line, qty 1–2, ~suitPct of value; only when the cheapest suit is ≤45% of the bill
+    if (suits.length && M >= minSuit / 0.45) {
+      const cap = M * 0.45, budget = M * suitPct;
+      const cand = suits.filter(r => r <= Math.min(cap, M - 200));
+      if (cand.length) {
+        const near = cand.filter(r => r <= Math.max(budget, minSuit) * 1.2);
+        const sr = bgPick(near.length ? near : cand, rnd);
+        let sq = 1;
+        if (budget >= sr * 1.7 && sr * 2 <= cap) sq = 2;   // occasionally two suits on big bills
+        items.push({ type:'Unstitched Suit', qty:sq, rate:sr });
+        rem -= sr * sq; lines--;
+      }
+    }
+    // SAREE — fill the bulk across (lines-1) lines, reserving one line for fabric
+    const sareeLines = Math.max(1, lines - 1);
+    for (let k = 0; k < sareeLines && rem > 100; k++) {
+      const r = bgPick(sarees, rnd);
+      let q = Math.round((rem / (sareeLines - k)) / r);
+      q = Math.min(q, Math.floor((rem - 100) / r));        // leave ≥ ₹100 for fabric
+      if (q < 1) q = 1;
+      if (r * q > rem) q = Math.floor(rem / r);
+      if (q < 1) continue;
+      items.push({ type:'Saree', qty:q, rate:r });
+      rem -= r * q;
+    }
+    // FABRIC — closes the remainder exactly (rem is a multiple of 100)
+    if (rem > 0) items.push({ type:'Fabric', qty: rem / 100, rate:100 });
+    return bgMerge(items);
+  }
+
   function autoFillItems(target, seed) {
     target = Math.round(target);
     const rnd = bgRng(seed);
-    const suitPct = (bgState ? bgState.suitPct : 30) / 100;
-    const suitPool  = (BG_PREF.suit.filter(r => bgState.rates.suit.includes(r)));
-    const sareePool = (BG_PREF.saree.filter(r => bgState.rates.saree.includes(r)));
+    const suitPool  = BG_PREF.suit.filter(r => bgState.rates.suit.includes(r));
+    const sareePref = BG_PREF.saree.filter(r => bgState.rates.saree.includes(r));
     const suits  = suitPool.length  ? suitPool  : bgState.rates.suit.filter(r => r % 100 === 0);
-    const sarees = sareePool.length ? sareePool : bgState.rates.saree.filter(r => r % 100 === 0);
-    const items = [];
-
-    let rem = target;
-    // suits ≈ suitPct of target value. Only on bills big enough that the cheapest
-    // suit stays under ~45% of the bill, so small bills are saree+fabric only.
-    const minSuit = suits.length ? Math.min(...suits) : Infinity;
-    if (suits.length && target >= minSuit / 0.45) {
-      const suitBudget = target * suitPct, cap = target * 0.45;
-      let suitUsed = 0, guard = 0;
-      while (guard++ < 5) {
-        if (suitUsed > 0 && suitBudget - suitUsed < minSuit) break;   // close enough to budget
-        const ceil = Math.min(cap - suitUsed, rem - 200);             // leave room for saree+fabric
-        const cand = suits.filter(r => r <= ceil);
-        if (!cand.length) break;
-        const near = cand.filter(r => r <= Math.max(suitBudget - suitUsed, minSuit) * 1.2);
-        const r = bgPick(near.length ? near : cand, rnd);
-        items.push({ type:'Unstitched Suit', qty:1, rate:r });
-        suitUsed += r; rem -= r;
-      }
+    const sarees = sareePref.length ? sareePref : bgState.rates.saree.filter(r => r % 100 === 0);
+    const L = target >= 15000 ? 4 : 3;
+    if (!sarees.length) return [{ type:'Saree', qty:1, rate:target }];
+    if (target % 100 === 0) return bgComposeMult100(target, L, rnd, suits, sarees);
+    // Odd target (e.g. ₹5,750, ₹650): one saree whose last two digits match the
+    // remainder, then compose the rest (a clean multiple of 100).
+    const odd = target % 100;
+    const enders = bgState.rates.saree.filter(r => r % 100 === odd && r <= target - 100);
+    if (enders.length) {
+      const r0 = bgPick(enders, rnd);
+      const rest = bgComposeMult100(target - r0, Math.max(2, L - 1), rnd, suits, sarees);
+      return bgMerge([{ type:'Saree', qty:1, rate:r0 }].concat(rest));
     }
-    // 3) sarees fill most of the rest, keeping rem closeable by fabric@100
-    if (sarees.length) {
-      let guard = 0;
-      while (rem >= Math.min(...sarees) + 100 && guard++ < 60) {
-        const cand = sarees.filter(r => r <= rem - 100);
-        if (!cand.length) break;
-        const r = bgPick(cand, rnd);
-        const ex = items.find(it => it.type==='Saree' && it.rate===r);
-        if (ex) ex.qty++; else items.push({ type:'Saree', qty:1, rate:r });
-        rem -= r;
-      }
-    }
-    // 4) close exactly
-    if (rem > 0) {
-      if (rem % 100 === 0) {
-        items.push({ type:'Fabric', qty: rem/100, rate:100 });
-      } else {
-        // odd leftover (e.g. ₹650, ₹50): a single Saree priced exactly closes it
-        const ex = items.find(it => it.type==='Saree' && it.rate===rem);
-        if (ex) ex.qty++; else items.push({ type:'Saree', qty:1, rate:rem });
-      }
-    }
-    if (!items.length) items.push({ type:'Saree', qty:1, rate:target });
-    return items;
+    return [{ type:'Saree', qty:1, rate:target }];
   }
 
   /* ---- build & open the grid ---- */
@@ -1259,7 +1276,7 @@ ${billPages}
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
-          <button class="bg-insert" title="insert a bill above" onclick="bgInsertBill(${bi})">＋ insert</button>
+          <button class="bg-insert" title="insert a bill above" onclick="bgInsertBill(${bi})">＋</button>
           <span class="bg-inv">${invNo}</span>
         </td>
         <td><input type="text" class="bg-date" value="${bill.date||''}" onchange="bgFieldChange(${bi},'date',this.value)"></td>
