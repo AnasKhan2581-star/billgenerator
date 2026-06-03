@@ -432,6 +432,13 @@
     <div id="itemContainer" style="margin-top:28px;"></div>
     <div id="billOutput" style="margin-top:40px;"></div>
     <div id="printSaveBtns" style="display:none;margin-top:30px;text-align:center;">
+      <label class="screen-only" style="margin-right:10px;font-size:14px;">Copies:
+        <select id="copyMode" style="padding:8px;border-radius:5px;">
+          <option value="orig_dup" selected>Original + Duplicate</option>
+          <option value="orig_dup_trip">Original + Duplicate + Triplicate</option>
+          <option value="only_dup">Only Duplicate</option>
+        </select>
+      </label>
       <button onclick="printBill()" style="padding:10px 20px;background:#555;color:white;border:none;border-radius:5px;">Print / Save as PDF</button>
       <button onclick="shareBill()" style="padding:10px 20px;background:#f57c00;color:white;border:none;border-radius:5px;margin-left:12px;">Share Bill</button>
     </div>
@@ -464,14 +471,29 @@
   }
 
   function printBill() {
+    const out = document.getElementById("billOutput");
+    if (!out || !out.innerHTML.trim()) { alert("Please generate the bill first."); return; }
+
+    // Bump the invoice number (same as before)
     const current = parseInt(document.getElementById("invoiceNo").value);
     const next = current + 1;
     setCookie("lastInvoice", next);
     document.getElementById("invoiceNo").value = next;
-    const billNo = document.querySelector("#billOutput strong").textContent.replace("Invoice No: ", "").trim();
-    document.title = `Bill ${billNo}`;
-    window.print();
-    setTimeout(() => { document.title = 'Bill Generator'; }, 1000);
+
+    // Choose how many labelled copies to print
+    const mode = (document.getElementById("copyMode") || {}).value || 'orig_dup';
+    const labels = mode === 'orig_dup_trip' ? ['Original','Duplicate','Triplicate']
+                 : mode === 'only_dup'      ? ['Duplicate']
+                 :                            ['Original','Duplicate'];
+
+    // Use the live bill body (reflects any HSN edits) for every copy
+    const bodyHTML = out.innerHTML;
+    const copies = labels.map(l => ({ bodyHTML, label: l }));
+
+    const w = window.open('', '_blank');
+    w.document.write(buildPrintWindowHTML(copies));
+    w.document.close();
+    w.focus();
   }
 
   function numberToWords(num) {
@@ -699,7 +721,7 @@
     const billPages = billsArray.map(b => `
       <div class="bill-page">
         <div style="text-align:center;position:relative;">
-          <span style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;">Duplicate</span>
+          <span style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;">${b.label || 'Duplicate'}</span>
           <h2 style="font-family:Helvetica,Arial,sans-serif;font-size:38px;margin:0;">Anas Traders</h2>
           <p style="margin:5px 0;font-size:16px;font-family:Arial,sans-serif;line-height:1.3;">
             4760/2, Ground Floor, Jaipuriya building,<br>
@@ -890,8 +912,10 @@ ${billPages}
   function printAllBills() {
     const ready = (window._batchResults||[]).filter(r=>r.statusMsg==='ok');
     if (!ready.length) { alert('No bills ready to print.'); return; }
+    // Print in descending invoice order (highest invoice first, lowest last)
+    const ordered = ready.slice().reverse();
     const w = window.open('', '_blank');
-    w.document.write(buildPrintWindowHTML(ready));
+    w.document.write(buildPrintWindowHTML(ordered));
     w.document.close();
     w.focus();
   }
@@ -1123,9 +1147,13 @@ ${billPages}
       prevBal = bal; buf = '';
     }
 
+    // Drop tiny "test" credits (e.g. ₹1 pings): no bill, and they never merge.
+    const MIN_CREDIT = 50;
+    const real = raw.filter(c => c.amount >= MIN_CREDIT);
+
     // Merge consecutive same-date, same-sender part payments
     const credits = [];
-    for (const c of raw) {
+    for (const c of real) {
       const last = credits[credits.length - 1];
       if (last && last.date === c.date && c.name && last.name === c.name) {
         last.amount += c.amount; last.parts++;
