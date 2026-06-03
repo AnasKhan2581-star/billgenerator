@@ -367,7 +367,12 @@
   ══════════════════════════════════════════ -->
   <div class="print-container" style="max-width:980px;margin:40px auto;background:white;padding:32px;border-radius:14px;">
     <div style="text-align:center;position:relative;">
-      <span style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;">Duplicate</span>
+      <select id="copyMode" title="Copies to print"
+              style="position:absolute;top:5px;right:5px;font-size:12px;font-style:italic;border:none;background:transparent;cursor:pointer;color:#000;">
+        <option value="orig_dup" selected>Original + Duplicate</option>
+        <option value="orig_dup_trip">Original + Duplicate + Triplicate</option>
+        <option value="only_dup">Only Duplicate</option>
+      </select>
       <h2 style="font-family:'Helvetica',font-weight:bold,cursive;font-size:38px;margin:0;">Anas Traders</h2>
       <p style="margin:5px 0;font-size:16px;">
         4760/2, Ground Floor, Jaipuriya building,<br>
@@ -432,13 +437,6 @@
     <div id="itemContainer" style="margin-top:28px;"></div>
     <div id="billOutput" style="margin-top:40px;"></div>
     <div id="printSaveBtns" style="display:none;margin-top:30px;text-align:center;">
-      <label class="screen-only" style="margin-right:10px;font-size:14px;">Copies:
-        <select id="copyMode" style="padding:8px;border-radius:5px;">
-          <option value="orig_dup" selected>Original + Duplicate</option>
-          <option value="orig_dup_trip">Original + Duplicate + Triplicate</option>
-          <option value="only_dup">Only Duplicate</option>
-        </select>
-      </label>
       <button onclick="printBill()" style="padding:10px 20px;background:#555;color:white;border:none;border-radius:5px;">Print / Save as PDF</button>
       <button onclick="shareBill()" style="padding:10px 20px;background:#f57c00;color:white;border:none;border-radius:5px;margin-left:12px;">Share Bill</button>
     </div>
@@ -673,46 +671,62 @@
   }
 
   function assembleBillHTML(invoiceNo, formattedDate, customerBlock, calc, totalInWords, useIGST) {
-    const {rows, totalTaxable, totalCGST, totalSGST, totalIGST, grandTotal} = calc;
+    const {totalTaxable, totalCGST, totalSGST, totalIGST, grandTotal} = calc;
+
+    // Compact mode for long bills (≥5 items) so up to ~8+ items still fit one page.
+    const compact = (calc.rows.match(/<tr/g) || []).length >= 5;
+    const cellPad   = compact ? '3px 6px' : '8px';
+    const tblMargin = compact ? '8px'  : '20px';
+    const totFont   = compact ? '13px' : '16px';
+    const hdrFont   = compact ? '13px' : '16px';
+    const termsTop  = compact ? '10px' : '30px';
+    const termsFont = compact ? '11px' : '14px';
+    const footTop   = compact ? '18px' : '60px';
+    const signGap   = compact ? '18px' : '50px';
+    let   rows      = calc.rows.replace(/padding:8px/g, `padding:${cellPad}`);
+    let   custBlock = compact
+      ? customerBlock.replace(/font-size:16px/g, 'font-size:12px').replace(/line-height:1\.5/g, 'line-height:1.2')
+      : customerBlock;
+
     return `
-      <div style="margin-top:6px;display:flex;justify-content:space-between;font-size:16px;">
+      <div style="margin-top:6px;display:flex;justify-content:space-between;font-size:${hdrFont};">
         <strong>Invoice No: ${invoiceNo}</strong>
         <strong>Date: ${formattedDate}</strong>
       </div>
-      ${customerBlock}
-      <table style="width:100%;border-collapse:collapse;margin-top:20px;">
+      ${custBlock}
+      <table style="width:100%;border-collapse:collapse;margin-top:${tblMargin};">
         <thead>
           <tr style="background:#f0f0f0;">
-            <th style="border:1px solid #ccc;padding:8px;">Sr. No.</th>
-            <th style="border:1px solid #ccc;padding:8px;">Description</th>
-            <th style="border:1px solid #ccc;padding:8px;">HSN Code</th>
-            <th style="border:1px solid #ccc;padding:8px;">Qty</th>
-            <th style="border:1px solid #ccc;padding:8px;">Unit</th>
-            <th style="border:1px solid #ccc;padding:8px;">Rate</th>
-            <th style="border:1px solid #ccc;padding:8px;">Amount</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">Sr. No.</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">Description</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">HSN Code</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">Qty</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">Unit</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">Rate</th>
+            <th style="border:1px solid #ccc;padding:${cellPad};">Amount</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <table style="width:100%;margin-top:20px;font-size:16px;">
+      <table style="width:100%;margin-top:${tblMargin};font-size:${totFont};">
         <tr><td><strong>Taxable Amount</strong></td><td style="text-align:right;">&#8377;${totalTaxable.toFixed(2)}</td></tr>
         <tr><td>CGST 2.5%</td><td style="text-align:right;">&#8377;${useIGST?'0.00':totalCGST.toFixed(2)}</td></tr>
         <tr><td>SGST 2.5%</td><td style="text-align:right;">&#8377;${useIGST?'0.00':totalSGST.toFixed(2)}</td></tr>
         <tr><td>IGST 5%</td><td style="text-align:right;">&#8377;${useIGST?totalIGST.toFixed(2):'0.00'}</td></tr>
         <tr><td><strong>Grand Total</strong></td><td style="text-align:right;"><strong>&#8377;${grandTotal.toFixed(2)}</strong></td></tr>
       </table>
-      <p style="margin-top:30px;font-size:14px;">
+      <p style="margin-top:${termsTop};font-size:${termsFont};">
         <strong>Terms &amp; Conditions:</strong><br>
         1. No return.<br>
         2. Exchange within 3 days.<br>
         3. No guarantee of fabric, color, cutdana, work etc in era of fashion.
       </p>
-      <p style="margin-top:10px;font-size:14px;">
+      <p style="margin-top:${compact?'6px':'10px'};font-size:${termsFont};">
         <strong>Amount in words:</strong> <span style="text-decoration:underline;">${totalInWords}</span>
       </p>
-      <div style="margin-top:60px;text-align:right;">
+      <div style="margin-top:${footTop};text-align:right;">
         <p><strong>For Anas Traders</strong></p>
-        <div style="height:50px;"></div>
+        <div style="height:${signGap};"></div>
         <p><strong>Proprietor</strong></p>
       </div>`;
   }
