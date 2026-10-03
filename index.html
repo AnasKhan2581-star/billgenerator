@@ -264,7 +264,7 @@
   <div id="taxSummaryModal">
     <div id="taxSummaryBox">
       <h3>🧾 Taxable Amount Summary</h3>
-      <p>Triple-click <strong>Anas Traders</strong> to load more bills.</p>
+      <p>Triple-click the <strong>GSTIN/UIN</strong> line to load more bills.</p>
       <div style="overflow-x:auto;">
         <table id="taxSummaryTable">
           <thead>
@@ -377,7 +377,7 @@
       <p style="margin:5px 0;font-size:16px;">
         4760/2, Ground Floor, Jaipuriya building,<br>
         Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
-        GSTIN/UIN: 07AGGPK5556M1ZX<br>
+        <span id="gstinLabel" style="cursor:default;user-select:none;">GSTIN/UIN: 07AGGPK5556M1ZX</span><br>
         01145604564, 9899558755<br>
         <strong id="taxInvoiceLabel" style="margin-top:3px;cursor:default;user-select:none;"> Tax Invoice</strong>
       </p>
@@ -528,7 +528,8 @@
     document.getElementById("w-checkbox").checked = true;
     toggleBillTo();
     setupBatchTrigger();
-    setupTaxSummaryTrigger(); // NEW
+    setupTaxSummaryTrigger();       // "Anas Traders" → statement → bills grid
+    setupTaxSummaryGstinTrigger();  // "GSTIN/UIN" → upload bills → taxable summary
   };
 
   function confirmIGST(checkbox) {
@@ -954,6 +955,22 @@ ${billPages}
         clearTimeout(timer);
         clicks = 0;
         document.getElementById('statementFileInput').click();
+      }
+    });
+  }
+
+  // Triple-click the GSTIN/UIN line → upload generated bills → taxable-amount summary.
+  function setupTaxSummaryGstinTrigger() {
+    const el = document.getElementById('gstinLabel');
+    if (!el) return;
+    let clicks = 0, timer = null;
+    el.addEventListener('click', () => {
+      clicks++;
+      if (clicks === 1) timer = setTimeout(() => { clicks = 0; }, 600);
+      if (clicks >= 3) {
+        clearTimeout(timer);
+        clicks = 0;
+        document.getElementById('taxSummaryFileInput').click();
       }
     });
   }
