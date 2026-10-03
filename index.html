@@ -986,7 +986,8 @@ ${billPages}
     const results = [];
     let loaded = 0;
     function onDone(parsed) {
-      results.push(parsed);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      for (const p of arr) results.push(p);
       loaded++;
       if (loaded === files.length) {
         results.sort((a, b) => {
@@ -1006,9 +1007,9 @@ ${billPages}
       } else {
         const reader = new FileReader();
         reader.onload = e => {
-          // Strip HTML tags to get plain text, then parse
+          // Strip HTML tags to get plain text, then parse (may hold many bills)
           const plain = e.target.result.replace(/<[^>]+>/g, ' ');
-          onDone(parseBillText(plain, file.name.replace(/\.[^.]+$/, '')));
+          onDone(parseAllBills(plain, file.name.replace(/\.[^.]+$/, '')));
         };
         reader.onerror = () => onDone({ billNo: file.name, date: '—', taxable: null, error: 'Could not read file' });
         reader.readAsText(file);
@@ -1033,7 +1034,32 @@ ${billPages}
       }
       text += '\n';
     }
-    return parseBillText(text, fallbackName);
+    return parseAllBills(text, fallbackName);
+  }
+
+  // Parse EVERY bill in a text blob — a single PDF may hold many bills (one per page).
+  // Split on each "Invoice No", then read that block's own Date and Taxable Amount.
+  function parseAllBills(text, fallbackName) {
+    const invRe = /Invoice\s*No[:\s.]+([A-Za-z0-9\-\/]+)/gi;
+    const marks = [];
+    let m;
+    while ((m = invRe.exec(text)) !== null) marks.push({ idx: m.index, billNo: m[1].trim() });
+    if (!marks.length) return [parseBillText(text, fallbackName)];
+    const out = [];
+    for (let i = 0; i < marks.length; i++) {
+      const chunk = text.slice(marks[i].idx, i + 1 < marks.length ? marks[i + 1].idx : text.length);
+      const billNo = marks[i].billNo;
+      let date = '—';
+      const dM = chunk.match(/Date[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+      if (dM) date = dM[1].trim();
+      let taxable = null;
+      const taxM = chunk.match(/Taxable\s+Amount[\s\S]{0,80}?([\d,]+\.\d{2})/i);
+      if (taxM) { const num = parseFloat(taxM[1].replace(/,/g, '')); if (!isNaN(num) && num > 0) taxable = num; }
+      out.push(taxable === null
+        ? { billNo, date, taxable: null, error: 'Taxable Amount not found' }
+        : { billNo, date, taxable, error: null });
+    }
+    return out;
   }
 
   function parseBillText(text, fallbackName) {
