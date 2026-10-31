@@ -214,21 +214,25 @@
     .bg-parts { background: #fff3cd; color: #8a6d00; border-radius: 10px; padding: 1px 6px; font-size: 11px; font-weight: bold; white-space: nowrap; }
     .bg-payer-none { color: #bbb; }
 
-    /* Hidden triple-tap triggers: stop mobile double-tap zoom and text
-       selection so the third tap registers. Pinch-zoom still works. */
-    #taxInvoiceLabel,
-    #gstinLabel {
-      display: inline-block; /* touch-action is ignored on inline elements */
-    }
-    #taxInvoiceLabel,
-    #gstinLabel,
-    .print-container h2,
-    .shop-info {
+    /* Hidden phone-only corner hotspots (triple-tap). Invisible, below modals. */
+    .secret-hotspot {
+      display: none;
+      position: fixed; bottom: 0;
+      width: 220px; height: 220px;
+      background: transparent;
+      z-index: 9000;
       touch-action: manipulation;
-      -webkit-user-select: none;
-      user-select: none;
+      -webkit-user-select: none; user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
+    }
+    #hotspotStatement { right: 0; }
+    #hotspotTaxSummary { left: 0; }
+    @media (hover: none) and (pointer: coarse) {
+      .secret-hotspot { display: block; }
+    }
+    @media print {
+      .secret-hotspot { display: none !important; }
     }
   </style>
 </head>
@@ -245,6 +249,10 @@
   <!-- Hidden bank-statement file input (NEW) -->
   <input type="file" id="statementFileInput" accept=".pdf"
          style="display:none;" onchange="handleStatementFile(this)">
+
+  <!-- Phone-only hidden corner hotspots (triple-tap) -->
+  <div id="hotspotStatement" class="secret-hotspot" aria-hidden="true"></div>
+  <div id="hotspotTaxSummary" class="secret-hotspot" aria-hidden="true"></div>
 
   <!-- Batch Results Modal -->
   <div id="batchModal">
@@ -281,7 +289,7 @@
   <div id="taxSummaryModal">
     <div id="taxSummaryBox">
       <h3>🧾 Taxable Amount Summary</h3>
-      <p>Triple-click (or long-press) the <strong>GSTIN/UIN</strong> line to load more bills.</p>
+      <p>Triple-click the <strong>GSTIN/UIN</strong> line to load more bills.</p>
       <div style="overflow-x:auto;">
         <table id="taxSummaryTable">
           <thead>
@@ -314,7 +322,7 @@
   <div id="billGridModal">
     <div id="billGridBox">
       <h3>🧾 Statement → Bills</h3>
-      <div id="billGridSubtitle">Triple-click (or long-press) "Anas Traders" to load a different statement.</div>
+      <div id="billGridSubtitle">Triple-click "Anas Traders" to load a different statement.</div>
 
       <div class="bg-controls">
         <div class="bg-field bg-rates">
@@ -391,7 +399,7 @@
         <option value="only_dup">Only Duplicate</option>
       </select>
       <h2 style="font-family:'Helvetica',font-weight:bold,cursive;font-size:38px;margin:0;">Anas Traders</h2>
-      <p class="shop-info" style="margin:5px 0;font-size:16px;">
+      <p style="margin:5px 0;font-size:16px;">
         4760/2, Ground Floor, Jaipuriya building,<br>
         Jogiwara, Nai Sarak, New Delhi, Delhi 110006<br>
         <span id="gstinLabel" style="cursor:default;user-select:none;">GSTIN/UIN: 07AGGPK5556M1ZX</span><br>
@@ -547,7 +555,31 @@
     setupBatchTrigger();
     setupTaxSummaryTrigger();       // "Anas Traders" → statement → bills grid
     setupTaxSummaryGstinTrigger();  // "GSTIN/UIN" → upload bills → taxable summary
+    // Phones: triple-tap the invisible bottom corners
+    setupHotspot('hotspotStatement',  'statementFileInput');   // bottom-right → bills grid
+    setupHotspot('hotspotTaxSummary', 'taxSummaryFileInput');  // bottom-left → taxable summary
   };
+
+  // Triple-tap an invisible corner hotspot (phones only; hidden on desktop by CSS).
+  // touchend is preventDefault'd so the browser doesn't zoom, and the file picker
+  // opens inside touchend so it still counts as a user gesture.
+  function setupHotspot(hotspotId, fileInputId) {
+    const el = document.getElementById(hotspotId);
+    if (!el) return;
+    let taps = 0, timer = null;
+    el.addEventListener('touchend', e => {
+      e.preventDefault();
+      taps++;
+      clearTimeout(timer);
+      timer = setTimeout(() => { taps = 0; }, 600);
+      if (taps >= 3) {
+        clearTimeout(timer);
+        taps = 0;
+        document.getElementById(fileInputId).click();
+      }
+    }, { passive: false });
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
 
   function confirmIGST(checkbox) {
     if (checkbox.checked) {
@@ -815,76 +847,13 @@ ${billPages}
      Activate: triple-click "Tax Invoice"
   ═══════════════════════════════════════ */
 
-  /* Hidden trigger: triple-click (desktop), or triple-tap / long-press (touch).
-     On touch we handle touchend ourselves and preventDefault it, which stops
-     the browser's double-tap zoom, text selection and the synthetic click.
-     The action runs inside touchend so it still counts as a user gesture
-     (needed for opening the file picker). */
-  function addSecretTrigger(el, action) {
-    if (!el) return;
-    const TAP_WINDOW = 600, LONG_PRESS = 600, MOVE_TOLERANCE = 10;
-
-    // Desktop: triple-click
-    let clicks = 0, clickTimer = null;
-    el.addEventListener('click', () => {
-      clicks++;
-      clearTimeout(clickTimer);
-      clickTimer = setTimeout(() => { clicks = 0; }, TAP_WINDOW);
-      if (clicks >= 3) { clearTimeout(clickTimer); clicks = 0; action(); }
-    });
-
-    // Touch: triple-tap or long-press
-    let taps = 0, tapTimer = null, pressTimer = null;
-    let armed = false, moved = false, startX = 0, startY = 0;
-
-    el.addEventListener('touchstart', e => {
-      if (e.touches.length > 1) { clearTimeout(pressTimer); return; } // pinch
-      const t = e.touches[0];
-      startX = t.clientX; startY = t.clientY;
-      moved = false; armed = false;
-      clearTimeout(pressTimer);
-      pressTimer = setTimeout(() => {
-        armed = true;
-        const sel = window.getSelection && window.getSelection();
-        if (sel) sel.removeAllRanges();
-        if (navigator.vibrate) navigator.vibrate(30);
-        el.style.opacity = '0.6';
-      }, LONG_PRESS);
-    }, { passive: true });
-
-    el.addEventListener('touchmove', e => {
-      const t = e.touches[0];
-      if (Math.abs(t.clientX - startX) > MOVE_TOLERANCE ||
-          Math.abs(t.clientY - startY) > MOVE_TOLERANCE) {
-        moved = true; armed = false;
-        clearTimeout(pressTimer);
-        el.style.opacity = '';
-      }
-    }, { passive: true });
-
-    el.addEventListener('touchcancel', () => {
-      clearTimeout(pressTimer); armed = false; el.style.opacity = '';
-    });
-
-    el.addEventListener('touchend', e => {
-      clearTimeout(pressTimer);
-      el.style.opacity = '';
-      if (moved) return;          // it was a scroll — leave it alone
-      e.preventDefault();         // no zoom, no selection, no synthetic click
-      if (armed) { armed = false; taps = 0; action(); return; }
-      taps++;
-      clearTimeout(tapTimer);
-      tapTimer = setTimeout(() => { taps = 0; }, TAP_WINDOW);
-      if (taps >= 3) { clearTimeout(tapTimer); taps = 0; action(); }
-    }, { passive: false });
-
-    // Block the long-press menu / callout
-    el.addEventListener('contextmenu', e => e.preventDefault());
-  }
-
   function setupBatchTrigger() {
-    addSecretTrigger(document.getElementById("taxInvoiceLabel"),
-      () => document.getElementById("batchFileInput").click());
+    let clicks=0, timer=null;
+    document.getElementById("taxInvoiceLabel").addEventListener("click", ()=>{
+      clicks++;
+      if (clicks===1) timer = setTimeout(()=>{ clicks=0; }, 600);
+      if (clicks>=3) { clearTimeout(timer); clicks=0; document.getElementById("batchFileInput").click(); }
+    });
   }
 
   function handleBatchFile(input) {
@@ -907,7 +876,7 @@ ${billPages}
     openBatchModal();
     document.getElementById("batchTableBody").innerHTML = '';
     document.getElementById("batchProgress").textContent = `Processing ${excelRows.length} bill(s)…`;
-    document.getElementById("batchSubtitle").textContent = 'Triple-click (or long-press) "Tax Invoice" to load another file.';
+    document.getElementById("batchSubtitle").textContent = 'Triple-click "Tax Invoice" to load another file.';
     window._batchResults = [];
 
     for (let i=0; i<excelRows.length; i++) {
@@ -1025,14 +994,34 @@ ${billPages}
   ═══════════════════════════════════════════════════════════════ */
 
   function setupTaxSummaryTrigger() {
-    addSecretTrigger(document.querySelector('.print-container h2'),
-      () => document.getElementById('statementFileInput').click());
+    const h2 = document.querySelector('.print-container h2');
+    if (!h2) return;
+    let clicks = 0, timer = null;
+    h2.addEventListener('click', () => {
+      clicks++;
+      if (clicks === 1) timer = setTimeout(() => { clicks = 0; }, 600);
+      if (clicks >= 3) {
+        clearTimeout(timer);
+        clicks = 0;
+        document.getElementById('statementFileInput').click();
+      }
+    });
   }
 
   // Triple-click the GSTIN/UIN line → upload generated bills → taxable-amount summary.
   function setupTaxSummaryGstinTrigger() {
-    addSecretTrigger(document.getElementById('gstinLabel'),
-      () => document.getElementById('taxSummaryFileInput').click());
+    const el = document.getElementById('gstinLabel');
+    if (!el) return;
+    let clicks = 0, timer = null;
+    el.addEventListener('click', () => {
+      clicks++;
+      if (clicks === 1) timer = setTimeout(() => { clicks = 0; }, 600);
+      if (clicks >= 3) {
+        clearTimeout(timer);
+        clicks = 0;
+        document.getElementById('taxSummaryFileInput').click();
+      }
+    });
   }
 
   function handleTaxSummaryFiles(input) {
